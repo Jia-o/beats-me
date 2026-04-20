@@ -13,17 +13,24 @@ import cv2
 import mediapipe as mp
 
 from .engine import PerceptionEngine
+from ._models import ensure_model, POSE_MODEL_URL
 import config
 
-_mp_pose = mp.solutions.pose
-_mp_drawing = mp.solutions.drawing_utils
-_mp_drawing_styles = mp.solutions.drawing_styles
+_vision        = mp.tasks.vision
+_BaseOptions   = mp.tasks.BaseOptions
+_PoseLandmarker        = _vision.PoseLandmarker
+_PoseLandmarkerOptions = _vision.PoseLandmarkerOptions
+_PoseLandmarksConn     = _vision.PoseLandmarksConnections
+_PoseLandmark          = _vision.PoseLandmark
+_RunningMode           = _vision.RunningMode
+_mp_drawing        = _vision.drawing_utils
+_mp_drawing_styles = _vision.drawing_styles
 
 
 class PoseEngine(PerceptionEngine):
     def __init__(self):
         super().__init__()
-        self._pose = None
+        self._landmarker = None
         self._gone_counter = 0
 
     # ------------------------------------------------------------------
@@ -31,18 +38,21 @@ class PoseEngine(PerceptionEngine):
     # ------------------------------------------------------------------
 
     def _on_start(self):
-        self._pose = _mp_pose.Pose(
-            static_image_mode=False,
-            model_complexity=1,
-            min_detection_confidence=0.5,
+        model_path = ensure_model(POSE_MODEL_URL, "pose_landmarker_lite.task")
+        options = _PoseLandmarkerOptions(
+            base_options=_BaseOptions(model_asset_path=model_path),
+            running_mode=_RunningMode.IMAGE,
+            min_pose_detection_confidence=0.5,
+            min_pose_presence_confidence=0.5,
             min_tracking_confidence=0.5,
         )
+        self._landmarker = _PoseLandmarker.create_from_options(options)
         self._gone_counter = 0
 
     def _on_stop(self):
-        if self._pose:
-            self._pose.close()
-            self._pose = None
+        if self._landmarker:
+            self._landmarker.close()
+            self._landmarker = None
 
     # ------------------------------------------------------------------
     # Frame processing
@@ -50,25 +60,25 @@ class PoseEngine(PerceptionEngine):
 
     def process_frame(self, frame):
         result = {"posture": None}
-        if not self._active or self._pose is None:
+        if not self._active or self._landmarker is None:
             return frame, result
 
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        rgb.flags.writeable = False
-        detection = self._pose.process(rgb)
-        rgb.flags.writeable = True
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+        detection = self._landmarker.detect(mp_image)
 
         annotated = frame.copy()
 
         if detection.pose_landmarks:
             self._gone_counter = 0
+            landmarks = detection.pose_landmarks[0]
             _mp_drawing.draw_landmarks(
                 annotated,
-                detection.pose_landmarks,
-                _mp_pose.POSE_CONNECTIONS,
-                landmark_drawing_spec=_mp_drawing_styles.get_default_pose_landmarks_style(),
+                landmarks,
+                _PoseLandmarksConn.POSE_LANDMARKS,
+                _mp_drawing_styles.get_default_pose_landmarks_style(),
             )
-            result["posture"] = self._classify(detection.pose_landmarks.landmark)
+            result["posture"] = self._classify(landmarks)
         else:
             self._gone_counter += 1
             if self._gone_counter >= config.GONE_TIMEOUT:
@@ -82,9 +92,9 @@ class PoseEngine(PerceptionEngine):
     # ------------------------------------------------------------------
 
     def _classify(self, landmarks) -> str:
-        nose           = landmarks[_mp_pose.PoseLandmark.NOSE]
-        left_shoulder  = landmarks[_mp_pose.PoseLandmark.LEFT_SHOULDER]
-        right_shoulder = landmarks[_mp_pose.PoseLandmark.RIGHT_SHOULDER]
+        nose           = landmarks[_PoseLandmark.NOSE]
+        left_shoulder  = landmarks[_PoseLandmark.LEFT_SHOULDER]
+        right_shoulder = landmarks[_PoseLandmark.RIGHT_SHOULDER]
 
         shoulder_mid_y = (left_shoulder.y + right_shoulder.y) / 2
 
@@ -95,3 +105,4 @@ class PoseEngine(PerceptionEngine):
         if offset < config.HEAD_DOWN_RATIO:
             return "head_down"
         return "upright"
+

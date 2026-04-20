@@ -15,6 +15,7 @@ Press M (or m) to stop the camera and return to the mode-selection screen.
 
 import queue
 import threading
+import time
 
 import cv2
 import customtkinter as ctk
@@ -98,36 +99,43 @@ class CameraView(ctk.CTkToplevel):
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.CAPTURE_WIDTH)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAPTURE_HEIGHT)
 
-        while self._running:
-            ok, frame = cap.read()
-            if not ok:
-                continue
+        if not cap.isOpened():
+            print(f"[beats-me] Could not open camera index {config.CAMERA_INDEX}.")
+            self._running = False
+            return
 
-            # Mirror so the feed feels natural (like a mirror / selfie view)
-            frame = cv2.flip(frame, 1)
+        try:
+            while self._running:
+                ok, frame = cap.read()
+                if not ok:
+                    time.sleep(0.01)
+                    continue
 
-            annotated, result = self._engine.process_frame(frame)
+                # Mirror so the feed feels natural (like a mirror / selfie view)
+                frame = cv2.flip(frame, 1)
 
-            # Route result to the active mode handler
-            gesture = result.get("gesture")
-            posture = result.get("posture")
-            emotion = result.get("emotion")
-            if gesture is not None:
-                self._handler.handle(gesture)
-            elif posture is not None:
-                self._handler.handle(posture)
-            elif emotion is not None:
-                self._handler.handle(emotion)
+                annotated, result = self._engine.process_frame(frame)
 
-            # Resize to display dimensions and convert color space
-            display = cv2.resize(annotated, (self.DISPLAY_W, self.DISPLAY_H))
-            rgb = cv2.cvtColor(display, cv2.COLOR_BGR2RGB)
-            img = Image.fromarray(rgb)
+                # Route result to the active mode handler
+                gesture = result.get("gesture")
+                posture = result.get("posture")
+                emotion = result.get("emotion")
+                if gesture is not None:
+                    self._handler.handle(gesture)
+                elif posture is not None:
+                    self._handler.handle(posture)
+                elif emotion is not None:
+                    self._handler.handle(emotion)
 
-            if not self._frame_q.full():
-                self._frame_q.put(img)
+                # Resize to display dimensions and convert color space
+                display = cv2.resize(annotated, (self.DISPLAY_W, self.DISPLAY_H))
+                rgb = cv2.cvtColor(display, cv2.COLOR_BGR2RGB)
+                img = Image.fromarray(rgb)
 
-        cap.release()
+                if not self._frame_q.full():
+                    self._frame_q.put(img)
+        finally:
+            cap.release()
 
     # ------------------------------------------------------------------
     # Tkinter polling loop (runs on the main thread)

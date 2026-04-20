@@ -18,16 +18,23 @@ import numpy as np
 from collections import deque
 
 from .engine import PerceptionEngine
+from ._models import ensure_model, HAND_MODEL_URL
 import config
 
-_mp_hands = mp.solutions.hands
-_mp_drawing = mp.solutions.drawing_utils
+_vision        = mp.tasks.vision
+_BaseOptions   = mp.tasks.BaseOptions
+_HandLandmarker        = _vision.HandLandmarker
+_HandLandmarkerOptions = _vision.HandLandmarkerOptions
+_HandLandmarksConn     = _vision.HandLandmarksConnections
+_RunningMode           = _vision.RunningMode
+_mp_drawing        = _vision.drawing_utils
+_mp_drawing_styles = _vision.drawing_styles
 
 
 class HandsEngine(PerceptionEngine):
     def __init__(self):
         super().__init__()
-        self._hands = None
+        self._landmarker = None
 
         # Swipe: track wrist x positions across recent frames
         self._wrist_x_history: deque = deque(maxlen=config.SWIPE_FRAMES)
@@ -44,21 +51,25 @@ class HandsEngine(PerceptionEngine):
     # ------------------------------------------------------------------
 
     def _on_start(self):
-        self._hands = _mp_hands.Hands(
-            static_image_mode=False,
-            max_num_hands=1,
-            min_detection_confidence=0.7,
+        model_path = ensure_model(HAND_MODEL_URL, "hand_landmarker.task")
+        options = _HandLandmarkerOptions(
+            base_options=_BaseOptions(model_asset_path=model_path),
+            running_mode=_RunningMode.IMAGE,
+            num_hands=1,
+            min_hand_detection_confidence=0.7,
+            min_hand_presence_confidence=0.5,
             min_tracking_confidence=0.5,
         )
+        self._landmarker = _HandLandmarker.create_from_options(options)
         self._wrist_x_history.clear()
         self._pinched = False
         self._point_up_frames = 0
         self._point_down_frames = 0
 
     def _on_stop(self):
-        if self._hands:
-            self._hands.close()
-            self._hands = None
+        if self._landmarker:
+            self._landmarker.close()
+            self._landmarker = None
 
     # ------------------------------------------------------------------
     # Frame processing
@@ -66,17 +77,16 @@ class HandsEngine(PerceptionEngine):
 
     def process_frame(self, frame):
         result = {"gesture": None}
-        if not self._active or self._hands is None:
+        if not self._active or self._landmarker is None:
             return frame, result
 
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        rgb.flags.writeable = False
-        detection = self._hands.process(rgb)
-        rgb.flags.writeable = True
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+        detection = self._landmarker.detect(mp_image)
 
         annotated = frame.copy()
 
-        if not detection.multi_hand_landmarks:
+        if not detection.hand_landmarks:
             # Reset all stateful counters when hand leaves frame
             self._wrist_x_history.clear()
             self._pinched = False
@@ -85,10 +95,16 @@ class HandsEngine(PerceptionEngine):
             return annotated, result
 
         # Use first detected hand only
-        hand_lm = detection.multi_hand_landmarks[0]
-        _mp_drawing.draw_landmarks(annotated, hand_lm, _mp_hands.HAND_CONNECTIONS)
+        landmarks = detection.hand_landmarks[0]
+        _mp_drawing.draw_landmarks(
+            annotated,
+            landmarks,
+            _HandLandmarksConn.HAND_CONNECTIONS,
+            _mp_drawing_styles.get_default_hand_landmarks_style(),
+            _mp_drawing_styles.get_default_hand_connections_style(),
+        )
 
-        gesture = self._classify(hand_lm)
+        gesture = self._classify(landmarks)
         result["gesture"] = gesture
         return annotated, result
 
@@ -96,12 +112,9 @@ class HandsEngine(PerceptionEngine):
     # Gesture classification
     # ------------------------------------------------------------------
 
-    def _classify(self, lm) -> str | None:
-        lms = lm.landmark
-
+    def _classify(self, lms) -> str | None:
         thumb_tip  = lms[4]
         index_tip  = lms[8]
-        index_pip  = lms[6]
         index_mcp  = lms[5]
         middle_tip = lms[12]
         ring_tip   = lms[16]
@@ -168,3 +181,4 @@ class HandsEngine(PerceptionEngine):
             self._point_down_frames = 0
 
         return None
+
