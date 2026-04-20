@@ -16,7 +16,8 @@ ctk.set_default_color_theme("blue")
 
 def _build_controller():
     """Return a real or mock Spotify controller depending on credential availability."""
-    if not all([config.SPOTIPY_CLIENT_ID, config.SPOTIPY_CLIENT_SECRET]):
+    if not all([config.SPOTIPY_CLIENT_ID, config.SPOTIPY_CLIENT_SECRET,
+                config.SPOTIPY_REDIRECT_URI]):
         print(
             "[beats-me] Spotify credentials not found in .env – "
             "running with MockSpotifyController (actions printed to console)."
@@ -27,7 +28,7 @@ def _build_controller():
     try:
         from spotify.controller import SpotifyController
         return SpotifyController()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"[beats-me] Spotify auth failed ({exc}) – falling back to mock controller.")
         from spotify.mock_controller import MockSpotifyController
         return MockSpotifyController()

@@ -1,7 +1,7 @@
 """
 perception/face.py – facial emotion detection for Emotion Mode.
 
-Uses MediaPipe Face Mesh landmark positions to infer expression.
+Uses MediaPipe Face Landmarker landmark positions to infer expression.
 
 Emotions detected
 -----------------
@@ -21,11 +21,17 @@ import cv2
 import mediapipe as mp
 
 from .engine import PerceptionEngine
+from ._models import ensure_model, FACE_MODEL_URL
 import config
 
-_mp_face_mesh = mp.solutions.face_mesh
-_mp_drawing = mp.solutions.drawing_utils
-_mp_drawing_styles = mp.solutions.drawing_styles
+_vision        = mp.tasks.vision
+_BaseOptions   = mp.tasks.BaseOptions
+_FaceLandmarker        = _vision.FaceLandmarker
+_FaceLandmarkerOptions = _vision.FaceLandmarkerOptions
+_FaceLandmarksConn     = _vision.FaceLandmarksConnections
+_RunningMode           = _vision.RunningMode
+_mp_drawing        = _vision.drawing_utils
+_mp_drawing_styles = _vision.drawing_styles
 
 # Landmark indices – from the canonical MediaPipe Face Mesh 468-point map.
 # Mouth corners (61, 291) and lip centre points (13, 14) are part of the
@@ -39,25 +45,28 @@ _LOWER_LIP    = 14
 class FaceEngine(PerceptionEngine):
     def __init__(self):
         super().__init__()
-        self._face_mesh = None
+        self._face_landmarker = None
 
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
 
     def _on_start(self):
-        self._face_mesh = _mp_face_mesh.FaceMesh(
-            static_image_mode=False,
-            max_num_faces=1,
-            refine_landmarks=True,
-            min_detection_confidence=0.5,
+        model_path = ensure_model(FACE_MODEL_URL, "face_landmarker.task")
+        options = _FaceLandmarkerOptions(
+            base_options=_BaseOptions(model_asset_path=model_path),
+            running_mode=_RunningMode.IMAGE,
+            num_faces=1,
+            min_face_detection_confidence=0.5,
+            min_face_presence_confidence=0.5,
             min_tracking_confidence=0.5,
         )
+        self._face_landmarker = _FaceLandmarker.create_from_options(options)
 
     def _on_stop(self):
-        if self._face_mesh:
-            self._face_mesh.close()
-            self._face_mesh = None
+        if self._face_landmarker:
+            self._face_landmarker.close()
+            self._face_landmarker = None
 
     # ------------------------------------------------------------------
     # Frame processing
@@ -65,26 +74,25 @@ class FaceEngine(PerceptionEngine):
 
     def process_frame(self, frame):
         result = {"emotion": "neutral"}
-        if not self._active or self._face_mesh is None:
+        if not self._active or self._face_landmarker is None:
             return frame, result
 
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        rgb.flags.writeable = False
-        detection = self._face_mesh.process(rgb)
-        rgb.flags.writeable = True
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+        detection = self._face_landmarker.detect(mp_image)
 
         annotated = frame.copy()
 
-        if detection.multi_face_landmarks:
-            face_lm = detection.multi_face_landmarks[0]
+        if detection.face_landmarks:
+            landmarks = detection.face_landmarks[0]
             _mp_drawing.draw_landmarks(
                 annotated,
-                face_lm,
-                _mp_face_mesh.FACEMESH_TESSELATION,
+                landmarks,
+                _FaceLandmarksConn.FACE_LANDMARKS_TESSELATION,
                 landmark_drawing_spec=None,
                 connection_drawing_spec=_mp_drawing_styles.get_default_face_mesh_tesselation_style(),
             )
-            result["emotion"] = self._classify(face_lm.landmark)
+            result["emotion"] = self._classify(landmarks)
 
         return annotated, result
 
@@ -112,3 +120,4 @@ class FaceEngine(PerceptionEngine):
         if diff < -config.SMILE_THRESHOLD:
             return "sad"
         return "neutral"
+
