@@ -1,23 +1,3 @@
-"""
-main.py – beats-me entry point and global state manager.
-
-Flow
-----
-1. Initialise the SpotifyController (triggers OAuth browser flow on first run).
-2. Show SelectionScreen (the Tk root window) and enter the main event loop.
-3. When the user picks a mode the selection screen hides itself, the
-   appropriate engine + mode handler are created, and a CameraView
-   (CTkToplevel) is opened.
-4. Pressing M (or closing CameraView) destroys the camera window and
-   brings the selection screen back – no restart required.
-
-Fallback
---------
-If Spotify credentials are missing or authentication fails the app falls
-back to MockSpotifyController, which prints actions to the console so the
-vision logic can still be exercised.
-"""
-
 import customtkinter as ctk
 
 import config

@@ -1,11 +1,3 @@
-"""
-config.py – API credentials, camera settings, and gesture/mode constants.
-
-Playlist IDs below are placeholders. Replace with real Spotify playlist IDs.
-Find a playlist ID by right-clicking it in Spotify → Share → Copy link;
-the ID is the string after /playlist/ and before any '?'.
-"""
-
 import os
 from dotenv import load_dotenv
 
@@ -21,10 +13,10 @@ SPOTIPY_REDIRECT_URI = os.getenv("SPOTIPY_REDIRECT_URI", "http://localhost:8888/
 # ---------------------------------------------------------------------------
 # Playlist IDs – replace these with real Spotify playlist IDs
 # ---------------------------------------------------------------------------
-PLAYLIST_FOCUS = "YOUR_FOCUS_PLAYLIST_ID"        # Focus Mode: head down / studying
-PLAYLIST_ENERGIZE = "YOUR_ENERGIZE_PLAYLIST_ID"  # Focus Mode: upright / energized
-PLAYLIST_MOODY = "YOUR_MOODY_PLAYLIST_ID"        # Emotion Mode: sad
-PLAYLIST_UPBEAT = "YOUR_UPBEAT_PLAYLIST_ID"      # Emotion Mode: happy
+PLAYLIST_FOCUS = "37i9dQZF1EIfjzgnbx4yqL?si=1e7447c1d91849a4"        # Focus Mode: head down / studying
+PLAYLIST_ENERGIZE = "7i9dQZF1EIgG2NEOhqsD7?si=566a2cd302d2416b"  # Focus Mode: upright / energized
+PLAYLIST_MOODY = "37i9dQZF1EIhmSBwUDxg84?si=04a0a0430f5d45f9"        # Emotion Mode: sad
+PLAYLIST_UPBEAT = "37i9dQZF1EVJHK7Q1TBABQ?si=4e44e327b6f54cd7"      # Emotion Mode: happy
 
 # ---------------------------------------------------------------------------
 # Camera
