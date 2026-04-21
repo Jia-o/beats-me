@@ -30,6 +30,8 @@ CAPTURE_HEIGHT = 720
 # ---------------------------------------------------------------------------
 # Pinch: normalized Euclidean distance between thumb tip and index tip
 PINCH_THRESHOLD = 0.05
+# Pinch hold: consecutive frames the pinch must be held before firing
+PINCH_HOLD_FRAMES = 4
 
 # Swipe: track wrist x over this many frames; fire if total displacement exceeds threshold
 SWIPE_FRAMES = 12
@@ -49,10 +51,14 @@ VOLUME_STEP = 10
 # Head down: nose-to-shoulder offset below this ratio (normalized coords)
 HEAD_DOWN_RATIO = 0.15
 # Gone: frames without a detected pose before switching to "gone"
-GONE_TIMEOUT = 30
+GONE_TIMEOUT = 90
+# Posture stable: consecutive frames the same posture must be held before emitting
+POSTURE_STABLE_FRAMES = 10
 
 # ---------------------------------------------------------------------------
 # Emotion Mode – face mesh thresholds
 # ---------------------------------------------------------------------------
 # Smile/frown: mouth-corner elevation relative to lip center (normalized coords)
 SMILE_THRESHOLD = 0.008
+# Emotion stable: consecutive frames the same emotion must be held before emitting
+EMOTION_STABLE_FRAMES = 15

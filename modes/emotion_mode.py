@@ -20,10 +20,12 @@ class EmotionMode:
         if emotion is None or emotion == self._last_emotion:
             return
 
-        self._last_emotion = emotion
-
         if emotion == "happy":
+            self._last_emotion = emotion
             self._ctrl.play_playlist(config.PLAYLIST_UPBEAT)
         elif emotion == "sad":
+            self._last_emotion = emotion
             self._ctrl.play_playlist(config.PLAYLIST_MOODY)
-        # neutral: leave current playback unchanged
+        # neutral: leave current playback unchanged and don't update _last_emotion
+        # so that a transient neutral read doesn't reset state and cause a
+        # restart when the detected emotion returns to the previous value.
