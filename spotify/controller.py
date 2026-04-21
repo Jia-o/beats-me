@@ -1,10 +1,3 @@
-"""
-spotify/controller.py – SpotifyController wrapping the Spotipy library.
-
-All public methods dispatch their API call to a daemon thread so the caller
-(typically the camera/UI thread) is never blocked.
-"""
-
 import threading
 
 import spotipy

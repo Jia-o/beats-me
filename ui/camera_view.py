@@ -25,16 +25,6 @@ import config
 
 
 class CameraView(ctk.CTkToplevel):
-    """
-    Parameters
-    ----------
-    master       : CTk root window (SelectionScreen)
-    mode_name    : human-readable mode label shown in the window title
-    engine       : PerceptionEngine subclass (already instantiated, not yet started)
-    mode_handler : ConductorMode / FocusMode / EmotionMode instance
-    on_back      : callable – invoked when the user presses M or closes the window
-    """
-
     DISPLAY_W = 960
     DISPLAY_H = 540
 
@@ -100,7 +90,7 @@ class CameraView(ctk.CTkToplevel):
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAPTURE_HEIGHT)
 
         if not cap.isOpened():
-            print(f"[beats-me] Could not open camera index {config.CAMERA_INDEX}.")
+            print(f"[ERROR] Camera index {config.CAMERA_INDEX} not found.")
             self._running = False
             return
 
@@ -111,39 +101,28 @@ class CameraView(ctk.CTkToplevel):
                     time.sleep(0.01)
                     continue
 
-                # Mirror so the feed feels natural (like a mirror / selfie view)
                 frame = cv2.flip(frame, 1)
-
                 annotated, result = self._engine.process_frame(frame)
+                action_key = result.get("gesture") or result.get("posture") or result.get("emotion")
+                
+                if action_key:
+                    self._handler.handle(action_key)
 
-                # Route result to the active mode handler
-                gesture = result.get("gesture")
-                posture = result.get("posture")
-                emotion = result.get("emotion")
-                if gesture is not None:
-                    self._handler.handle(gesture)
-                elif posture is not None:
-                    self._handler.handle(posture)
-                elif emotion is not None:
-                    self._handler.handle(emotion)
-
-                # Resize to display dimensions and convert color space
                 display = cv2.resize(annotated, (self.DISPLAY_W, self.DISPLAY_H))
                 rgb = cv2.cvtColor(display, cv2.COLOR_BGR2RGB)
                 img = Image.fromarray(rgb)
 
                 if not self._frame_q.full():
                     self._frame_q.put(img)
+                time.sleep(0.01)
         finally:
             cap.release()
 
-    # ------------------------------------------------------------------
-    # Tkinter polling loop (runs on the main thread)
-    # ------------------------------------------------------------------
-
     def _poll_frame(self):
+        """Checks the queue for new frames and updates the UI label."""
         if not self._running:
             return
+            
         try:
             img = self._frame_q.get_nowait()
             ctk_img = ctk.CTkImage(
@@ -152,15 +131,12 @@ class CameraView(ctk.CTkToplevel):
                 size=(self.DISPLAY_W, self.DISPLAY_H),
             )
             self._video_label.configure(image=ctk_img)
-            self._video_label.image = ctk_img  # keep a reference to prevent GC
+            self._video_label.image = ctk_img 
         except queue.Empty:
             pass
 
-        self.after(33, self._poll_frame)  # ≈ 30 fps
-
-    # ------------------------------------------------------------------
-    # Back navigation
-    # ------------------------------------------------------------------
+        # Schedule next check in ~30ms (aiming for 30-60 FPS UI updates)
+        self.after(30, self._poll_frame)
 
     def _go_back(self, _event=None):
         self._running = False
