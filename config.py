@@ -34,16 +34,18 @@ PINCH_THRESHOLD = 0.05
 PINCH_HOLD_FRAMES = 4
 
 # Swipe: track wrist x over this many frames; fire if total displacement exceeds threshold
-SWIPE_FRAMES = 12
+# AND peak single-frame velocity exceeds SWIPE_MIN_VELOCITY (prevents slow drift from firing)
+SWIPE_FRAMES = 10
 SWIPE_THRESHOLD = 0.18          # Minimum normalized horizontal displacement
+SWIPE_MIN_VELOCITY = 0.035      # Minimum single-frame delta to qualify as a deliberate swipe
 
 # Point hold: frames the index finger must be held up/down before first trigger
 POINT_HOLD_FRAMES = 18
 # Point repeat: once triggered, fire again every N frames while still held
-POINT_REPEAT_INTERVAL = 30
+POINT_REPEAT_INTERVAL = 45
 
 # Volume step per point trigger (percentage points, signed by direction)
-VOLUME_STEP = 10
+VOLUME_STEP = 3
 
 # ---------------------------------------------------------------------------
 # Focus Mode – pose thresholds
@@ -55,10 +57,3 @@ GONE_TIMEOUT = 90
 # Posture stable: consecutive frames the same posture must be held before emitting
 POSTURE_STABLE_FRAMES = 10
 
-# ---------------------------------------------------------------------------
-# Emotion Mode – face mesh thresholds
-# ---------------------------------------------------------------------------
-# Smile/frown: mouth-corner elevation relative to lip center (normalized coords)
-SMILE_THRESHOLD = 0.008
-# Emotion stable: consecutive frames the same emotion must be held before emitting
-EMOTION_STABLE_FRAMES = 15

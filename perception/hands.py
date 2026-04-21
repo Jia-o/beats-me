@@ -144,32 +144,53 @@ class HandsEngine(PerceptionEngine):
 
         # ----------------------------------------------------------------
         # 2. Swipe – horizontal wrist displacement over recent frames
+        #    Requires BOTH total displacement AND a minimum peak per-frame
+        #    velocity so that slow natural drift does not trigger a swipe.
         # ----------------------------------------------------------------
         self._wrist_x_history.append(wrist.x)
         if len(self._wrist_x_history) == config.SWIPE_FRAMES:
             dx = self._wrist_x_history[-1] - self._wrist_x_history[0]
             if abs(dx) > config.SWIPE_THRESHOLD:
-                self._wrist_x_history.clear()
-                # In a mirrored frame: positive dx = hand moved toward screen-right
-                return "right" if dx > 0 else "left"
+                frames = self._wrist_x_history
+                peak_vel = max(abs(frames[i + 1] - frames[i]) for i in range(len(frames) - 1))
+                if peak_vel >= config.SWIPE_MIN_VELOCITY:
+                    self._wrist_x_history.clear()
+                    # In a mirrored frame: positive dx = hand moved toward screen-right
+                    return "right" if dx > 0 else "left"
 
         # ----------------------------------------------------------------
-        # 3. Point up / down – index extended, others curled, held
+        # 3. Point up / down – only index finger extended, others curled
+        #
+        #    Point UP:   index tip well above wrist, tip above its MCP,
+        #                other tips below their own MCPs (curled).
+        #    Point DOWN: index tip well below wrist, tip below its MCP,
+        #                other tips above the index tip (not extended down).
         # ----------------------------------------------------------------
-        index_extended = index_tip.y < index_mcp.y  # tip above MCP (y smaller = higher)
-        others_curled  = all(t.y > index_mcp.y for t in (middle_tip, ring_tip, pinky_tip))
+        if not is_pinching:
+            middle_mcp = lms[9]
+            ring_mcp   = lms[13]
+            pinky_mcp  = lms[17]
 
-        if index_extended and others_curled and not is_pinching:
-            # Direction: compare index tip y to wrist y
-            # tip well above wrist → pointing up; tip near or below → pointing down
-            if index_tip.y < wrist.y - 0.15:
+            # ---- pointing up ----
+            index_above_mcp   = index_tip.y < index_mcp.y
+            others_curled_up  = all(t.y > mcp.y
+                                    for t, mcp in ((middle_tip, middle_mcp),
+                                                   (ring_tip,   ring_mcp),
+                                                   (pinky_tip,  pinky_mcp)))
+            if index_above_mcp and others_curled_up and index_tip.y < wrist.y - 0.15:
                 self._point_up_frames += 1
                 self._point_down_frames = 0
-            elif index_tip.y > wrist.y + 0.05:
+            else:
+                self._point_up_frames = 0
+
+            # ---- pointing down ----
+            index_below_mcp     = index_tip.y > index_mcp.y
+            others_not_extended = all(t.y < index_tip.y + 0.05
+                                      for t in (middle_tip, ring_tip, pinky_tip))
+            if index_below_mcp and others_not_extended and index_tip.y > wrist.y + 0.08:
                 self._point_down_frames += 1
                 self._point_up_frames = 0
             else:
-                self._point_up_frames = 0
                 self._point_down_frames = 0
 
             # Fire on initial hold threshold, then every POINT_REPEAT_INTERVAL frames
@@ -182,9 +203,6 @@ class HandsEngine(PerceptionEngine):
                 elapsed = self._point_down_frames - config.POINT_HOLD_FRAMES
                 if elapsed == 0 or elapsed % config.POINT_REPEAT_INTERVAL == 0:
                     return "down"
-        else:
-            self._point_up_frames = 0
-            self._point_down_frames = 0
 
         return None
 

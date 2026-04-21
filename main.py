@@ -3,10 +3,8 @@ import customtkinter as ctk
 import config
 from perception.hands import HandsEngine
 from perception.pose  import PoseEngine
-from perception.face  import FaceEngine
 from modes.conductor_mode import ConductorMode
 from modes.focus_mode     import FocusMode
-from modes.emotion_mode   import EmotionMode
 from ui.selection_screen  import SelectionScreen
 from ui.camera_view       import CameraView
 
@@ -53,10 +51,6 @@ def main():
             engine  = PoseEngine()
             handler = FocusMode(controller)
             name    = "Focus Mode"
-        elif mode == "emotion":
-            engine  = FaceEngine()
-            handler = EmotionMode(controller)
-            name    = "Emotion Mode"
         else:
             root.deiconify()
             return
