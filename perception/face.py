@@ -46,6 +46,16 @@ class FaceEngine(PerceptionEngine):
     def __init__(self):
         super().__init__()
         self._face_landmarker = None
+        # Stability tracking: only emit a new emotion after it is held for
+        # EMOTION_STABLE_FRAMES consecutive frames.
+        self._emotion_candidate: str | None = None
+        self._emotion_candidate_frames: int = 0
+        self._current_emotion: str | None = None
+
+    def _reset_emotion_state(self):
+        self._emotion_candidate = None
+        self._emotion_candidate_frames = 0
+        self._current_emotion = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -62,6 +72,7 @@ class FaceEngine(PerceptionEngine):
             min_tracking_confidence=0.5,
         )
         self._face_landmarker = _FaceLandmarker.create_from_options(options)
+        self._reset_emotion_state()
 
     def _on_stop(self):
         if self._face_landmarker:
@@ -73,7 +84,7 @@ class FaceEngine(PerceptionEngine):
     # ------------------------------------------------------------------
 
     def process_frame(self, frame):
-        result = {"emotion": "neutral"}
+        result = {"emotion": None}
         if not self._active or self._face_landmarker is None:
             return frame, result
 
@@ -92,7 +103,21 @@ class FaceEngine(PerceptionEngine):
                 landmark_drawing_spec=None,
                 connection_drawing_spec=_mp_drawing_styles.get_default_face_mesh_tesselation_style(),
             )
-            result["emotion"] = self._classify(landmarks)
+            candidate = self._classify(landmarks)
+            if candidate == self._emotion_candidate:
+                self._emotion_candidate_frames += 1
+            else:
+                self._emotion_candidate = candidate
+                self._emotion_candidate_frames = 1
+            if self._emotion_candidate_frames >= config.EMOTION_STABLE_FRAMES:
+                self._current_emotion = candidate
+            result["emotion"] = self._current_emotion
+        else:
+            # No face in frame – reset candidate so re-detection starts fresh.
+            # Keep _current_emotion so a brief dropout doesn't clear state.
+            self._emotion_candidate = None
+            self._emotion_candidate_frames = 0
+            result["emotion"] = None
 
         return annotated, result
 

@@ -32,6 +32,17 @@ class PoseEngine(PerceptionEngine):
         super().__init__()
         self._landmarker = None
         self._gone_counter = 0
+        # Stability tracking: only emit a new posture after it is held for
+        # POSTURE_STABLE_FRAMES consecutive frames.
+        self._posture_candidate: str | None = None
+        self._posture_candidate_frames: int = 0
+        self._current_posture: str | None = None
+
+    def _reset_posture_state(self):
+        self._gone_counter = 0
+        self._posture_candidate = None
+        self._posture_candidate_frames = 0
+        self._current_posture = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -42,12 +53,12 @@ class PoseEngine(PerceptionEngine):
         options = _PoseLandmarkerOptions(
             base_options=_BaseOptions(model_asset_path=model_path),
             running_mode=_RunningMode.IMAGE,
-            min_pose_detection_confidence=0.5,
-            min_pose_presence_confidence=0.5,
-            min_tracking_confidence=0.5,
+            min_pose_detection_confidence=0.3,
+            min_pose_presence_confidence=0.3,
+            min_tracking_confidence=0.3,
         )
         self._landmarker = _PoseLandmarker.create_from_options(options)
-        self._gone_counter = 0
+        self._reset_posture_state()
 
     def _on_stop(self):
         if self._landmarker:
@@ -78,11 +89,22 @@ class PoseEngine(PerceptionEngine):
                 _PoseLandmarksConn.POSE_LANDMARKS,
                 _mp_drawing_styles.get_default_pose_landmarks_style(),
             )
-            result["posture"] = self._classify(landmarks)
+            candidate = self._classify(landmarks)
+            if candidate == self._posture_candidate:
+                self._posture_candidate_frames += 1
+            else:
+                self._posture_candidate = candidate
+                self._posture_candidate_frames = 1
+            if self._posture_candidate_frames >= config.POSTURE_STABLE_FRAMES:
+                self._current_posture = candidate
+            result["posture"] = self._current_posture
         else:
             self._gone_counter += 1
+            self._posture_candidate = None
+            self._posture_candidate_frames = 0
             if self._gone_counter >= config.GONE_TIMEOUT:
                 result["posture"] = "gone"
+                self._current_posture = None
             # else: result["posture"] stays None → FocusMode ignores it
 
         return annotated, result

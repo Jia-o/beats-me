@@ -29,4 +29,7 @@ class FocusMode:
         elif posture == "upright":
             self._ctrl.play_playlist(config.PLAYLIST_ENERGIZE)
         elif posture == "gone":
-            self._ctrl.pause()
+            # Only pause if the person was upright (not mid-focus with head down),
+            # to avoid pausing when pose detection briefly loses a bowed head.
+            if self._last_posture != "head_down":
+                self._ctrl.pause()

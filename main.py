@@ -39,6 +39,7 @@ def main():
     root = None  # assigned below; referenced by closures
 
     def on_back():
+        controller.pause()
         root.deiconify()
 
     def on_mode_selected(mode: str):

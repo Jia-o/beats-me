@@ -4,12 +4,12 @@ perception/hands.py – gesture recognition for Conductor Mode.
 Gestures detected
 -----------------
 pinch       – thumb tip + index tip distance drops below threshold (toggle: fires
-              once per close, resets when hand opens).
-swipe_left  – wrist moves left  > SWIPE_THRESHOLD over SWIPE_FRAMES frames.
-swipe_right – wrist moves right > SWIPE_THRESHOLD over SWIPE_FRAMES frames.
-point_up    – index finger extended upward, other fingers curled, held for
+              once per close after PINCH_HOLD_FRAMES, resets when hand opens).
+left        – wrist moves left  > SWIPE_THRESHOLD over SWIPE_FRAMES frames.
+right       – wrist moves right > SWIPE_THRESHOLD over SWIPE_FRAMES frames.
+up          – index finger extended upward, other fingers curled, held for
               POINT_HOLD_FRAMES then repeating every POINT_REPEAT_INTERVAL frames.
-point_down  – same but finger angled downward.
+down        – same but finger angled downward.
 """
 
 import cv2
@@ -41,8 +41,16 @@ class HandsEngine(PerceptionEngine):
 
         # Pinch state
         self._pinched = False
+        self._pinch_frames = 0
 
         # Point hold counters
+        self._point_up_frames = 0
+        self._point_down_frames = 0
+
+    def _reset_gesture_state(self):
+        self._wrist_x_history.clear()
+        self._pinched = False
+        self._pinch_frames = 0
         self._point_up_frames = 0
         self._point_down_frames = 0
 
@@ -61,10 +69,7 @@ class HandsEngine(PerceptionEngine):
             min_tracking_confidence=0.5,
         )
         self._landmarker = _HandLandmarker.create_from_options(options)
-        self._wrist_x_history.clear()
-        self._pinched = False
-        self._point_up_frames = 0
-        self._point_down_frames = 0
+        self._reset_gesture_state()
 
     def _on_stop(self):
         if self._landmarker:
@@ -88,10 +93,7 @@ class HandsEngine(PerceptionEngine):
 
         if not detection.hand_landmarks:
             # Reset all stateful counters when hand leaves frame
-            self._wrist_x_history.clear()
-            self._pinched = False
-            self._point_up_frames = 0
-            self._point_down_frames = 0
+            self._reset_gesture_state()
             return annotated, result
 
         # Use first detected hand only
@@ -122,19 +124,23 @@ class HandsEngine(PerceptionEngine):
         wrist      = lms[0]
 
         # ----------------------------------------------------------------
-        # 1. Pinch – thumb tip ↔ index tip distance (toggle)
+        # 1. Pinch – thumb tip ↔ index tip distance (toggle, with hold debounce)
         # ----------------------------------------------------------------
         pinch_dist = float(np.hypot(thumb_tip.x - index_tip.x, thumb_tip.y - index_tip.y))
         is_pinching = pinch_dist < config.PINCH_THRESHOLD
 
         if is_pinching and not self._pinched:
-            self._pinched = True
-            # Reset hold counters so a pinch mid-point-hold doesn't double-fire
-            self._point_up_frames = 0
-            self._point_down_frames = 0
-            return "pinch"
-        if not is_pinching:
+            self._pinch_frames += 1
+            if self._pinch_frames >= config.PINCH_HOLD_FRAMES:
+                self._pinched = True
+                self._pinch_frames = 0
+                # Reset hold counters so a pinch mid-point-hold doesn't double-fire
+                self._point_up_frames = 0
+                self._point_down_frames = 0
+                return "pinch"
+        elif not is_pinching:
             self._pinched = False
+            self._pinch_frames = 0
 
         # ----------------------------------------------------------------
         # 2. Swipe – horizontal wrist displacement over recent frames
@@ -145,7 +151,7 @@ class HandsEngine(PerceptionEngine):
             if abs(dx) > config.SWIPE_THRESHOLD:
                 self._wrist_x_history.clear()
                 # In a mirrored frame: positive dx = hand moved toward screen-right
-                return "swipe_right" if dx > 0 else "swipe_left"
+                return "right" if dx > 0 else "left"
 
         # ----------------------------------------------------------------
         # 3. Point up / down – index extended, others curled, held
@@ -170,12 +176,12 @@ class HandsEngine(PerceptionEngine):
             if self._point_up_frames >= config.POINT_HOLD_FRAMES:
                 elapsed = self._point_up_frames - config.POINT_HOLD_FRAMES
                 if elapsed == 0 or elapsed % config.POINT_REPEAT_INTERVAL == 0:
-                    return "point_up"
+                    return "up"
 
             if self._point_down_frames >= config.POINT_HOLD_FRAMES:
                 elapsed = self._point_down_frames - config.POINT_HOLD_FRAMES
                 if elapsed == 0 or elapsed % config.POINT_REPEAT_INTERVAL == 0:
-                    return "point_down"
+                    return "down"
         else:
             self._point_up_frames = 0
             self._point_down_frames = 0
