@@ -1,4 +1,5 @@
 import threading
+import time
 
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -45,6 +46,15 @@ class SpotifyController:
 
         threading.Thread(target=_worker, daemon=True).start()
 
+    def _current_volume(self) -> int | None:
+        playback = self._sp.current_playback()
+        if playback and playback.get("device") and playback["device"].get("volume_percent") is not None:
+            return int(playback["device"]["volume_percent"])
+        return None
+
+    def _set_volume(self, vol: int):
+        self._sp.volume(max(0, min(100, int(vol))))
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -56,6 +66,61 @@ class SpotifyController:
     def previous_track(self):
         print("[Spotify] ← Previous track")
         self._dispatch(self._sp.previous_track)
+
+    def set_volume(self, vol: int):
+        print(f"[Spotify] 🔊 Set volume: {vol}%")
+
+        def _worker():
+            try:
+                self._set_volume(vol)
+            except SpotifyException as exc:
+                self._handle_exc(exc)
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def next_track_crossfade(self):
+        print("[Spotify] → Next track (crossfade)")
+        self._dispatch(self._crossfade_skip, direction="next")
+
+    def previous_track_crossfade(self):
+        print("[Spotify] ← Previous track (crossfade)")
+        self._dispatch(self._crossfade_skip, direction="prev")
+
+    def _crossfade_skip(self, direction: str):
+        """
+        Spotify doesn't expose true local crossfade via the Web API.
+        We approximate by ramping device volume down, skipping, then ramping back up.
+        """
+        try:
+            base = self._current_volume()
+            if base is None:
+                # No device info; just skip
+                return self._sp.next_track() if direction == "next" else self._sp.previous_track()
+
+            drop = min(config.CROSSFADE_TARGET_VOLUME_DROP, base)
+            low = max(0, base - drop)
+            steps = 6
+            step_ms = max(30, int(config.CROSSFADE_MS / (2 * steps)))
+
+            # fade down
+            for i in range(steps):
+                vol = int(base + (low - base) * ((i + 1) / steps))
+                self._set_volume(vol)
+                time.sleep(step_ms / 1000.0)
+
+            # skip
+            if direction == "next":
+                self._sp.next_track()
+            else:
+                self._sp.previous_track()
+
+            # fade up
+            for i in range(steps):
+                vol = int(low + (base - low) * ((i + 1) / steps))
+                self._set_volume(vol)
+                time.sleep(step_ms / 1000.0)
+        except SpotifyException as exc:
+            self._handle_exc(exc)
 
     def toggle_play(self):
         print("[Spotify] ⏯  Toggle play/pause")

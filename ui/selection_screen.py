@@ -9,15 +9,15 @@ import customtkinter as ctk
 _MODES = [
     (
         "🎵",
-        "Conductor Mode",
-        "conductor",
-        "Control playback with hand gestures\nPinch · Swipe · Point",
+        "Personal Mode",
+        "personal",
+        "Your playlists + camera-aware auto-pause\nWave to activate · Pinch/Swipe/Point to control",
     ),
     (
-        "📚",
-        "Focus Mode",
-        "focus",
-        "Playlist adapts to your posture\nHead down → focus  ·  Upright → energize",
+        "🏫",
+        "Staff Mode",
+        "staff",
+        "Staff playlist + announcement pause\nVoice phrase pauses · Wave to activate controls",
     ),
 ]
 

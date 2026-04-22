@@ -41,12 +41,23 @@ class CameraView(ctk.CTkToplevel):
 
         self._frame_q: queue.Queue = queue.Queue(maxsize=2)
         self._running = False
+        self._latest_result: dict = {}
+        self._debug_win = None
+        self._debug_text = None
+        self._log_win = None
+        self._log_text = None
 
         self._build_ui()
 
         # Pressing M from the camera view returns to selection
         self.bind("<KeyPress-m>", self._go_back)
         self.bind("<KeyPress-M>", self._go_back)
+        self.bind("<KeyPress-d>", lambda _e: self._toggle_debug())
+        self.bind("<KeyPress-D>", lambda _e: self._toggle_debug())
+        self.bind("<KeyPress-l>", lambda _e: self._toggle_log())
+        self.bind("<KeyPress-L>", lambda _e: self._toggle_log())
+        self.bind("<KeyPress-t>", lambda _e: self._set_topic())
+        self.bind("<KeyPress-T>", lambda _e: self._set_topic())
         self.protocol("WM_DELETE_WINDOW", self._go_back)
 
         # Give the window a moment to render before starting the camera
@@ -68,11 +79,20 @@ class CameraView(ctk.CTkToplevel):
         bar = ctk.CTkFrame(self, height=56, corner_radius=0)
         bar.pack(fill="x")
 
-        ctk.CTkLabel(
+        self._hint_label = ctk.CTkLabel(
             bar,
-            text="Press  M  to return to mode selection",
+            text="Press  M  to return • D debug • L log • T topic (staff)",
             text_color="gray60",
-        ).pack(pady=16)
+        )
+        self._hint_label.pack(pady=(10, 0))
+
+        self._status_label = ctk.CTkLabel(
+            bar,
+            text="",
+            text_color="gray70",
+            font=ctk.CTkFont(size=12),
+        )
+        self._status_label.pack(pady=(0, 10))
 
     # ------------------------------------------------------------------
     # Camera thread
@@ -103,10 +123,15 @@ class CameraView(ctk.CTkToplevel):
 
                 frame = cv2.flip(frame, 1)
                 annotated, result = self._engine.process_frame(frame)
-                action_key = result.get("gesture") or result.get("posture") or result.get("emotion")
-                
-                if action_key:
-                    self._handler.handle(action_key)
+                self._latest_result = result
+
+                # Prefer rich result handler if available; keep backward compatibility
+                if hasattr(self._handler, "handle_result"):
+                    self._handler.handle_result(result)
+                else:
+                    action_key = result.get("gesture") or result.get("posture") or result.get("emotion")
+                    if action_key:
+                        self._handler.handle(action_key)
 
                 display = cv2.resize(annotated, (self.DISPLAY_W, self.DISPLAY_H))
                 rgb = cv2.cvtColor(display, cv2.COLOR_BGR2RGB)
@@ -136,10 +161,118 @@ class CameraView(ctk.CTkToplevel):
             pass
 
         # Schedule next check in ~30ms (aiming for 30-60 FPS UI updates)
+        self._update_status()
         self.after(30, self._poll_frame)
+
+    def _update_status(self):
+        try:
+            status = {}
+            if hasattr(self._engine, "get_status"):
+                status.update(self._engine.get_status() or {})
+            if hasattr(self._handler, "get_status"):
+                status.update(self._handler.get_status() or {})
+
+            parts = []
+            if status.get("gesture_state"):
+                parts.append(f"hands: {status['gesture_state']}")
+            if status.get("last_command"):
+                parts.append(f"cmd: {status['last_command']}")
+            if status.get("presence_paused"):
+                parts.append("auto-paused")
+            if status.get("announcement_paused"):
+                parts.append("announcement-paused")
+            if status.get("topic"):
+                parts.append(f"topic: {status['topic']}")
+            if status.get("suggestions"):
+                s = status["suggestions"]
+                if isinstance(s, list) and s:
+                    parts.append("suggest: " + " · ".join(s[:2]))
+
+            self._status_label.configure(text=" | ".join(parts))
+        except Exception:
+            # Status is best-effort; never break the UI loop.
+            return
+
+        self._update_debug_windows()
+
+    def _toggle_debug(self):
+        if self._debug_win and self._debug_win.winfo_exists():
+            self._debug_win.destroy()
+            self._debug_win = None
+            self._debug_text = None
+            return
+
+        win = ctk.CTkToplevel(self)
+        win.title("beats-me – debug")
+        win.geometry("560x520")
+        win.resizable(True, True)
+        txt = ctk.CTkTextbox(win)
+        txt.pack(fill="both", expand=True)
+        self._debug_win = win
+        self._debug_text = txt
+        self._update_debug_windows()
+
+    def _toggle_log(self):
+        if self._log_win and self._log_win.winfo_exists():
+            self._log_win.destroy()
+            self._log_win = None
+            self._log_text = None
+            return
+
+        win = ctk.CTkToplevel(self)
+        win.title("beats-me – event log")
+        win.geometry("760x520")
+        win.resizable(True, True)
+        txt = ctk.CTkTextbox(win)
+        txt.pack(fill="both", expand=True)
+        self._log_win = win
+        self._log_text = txt
+        self._update_debug_windows()
+
+    def _set_topic(self):
+        if not hasattr(self._handler, "set_topic"):
+            return
+        try:
+            dlg = ctk.CTkInputDialog(text="Set grading topic (e.g. recursion):", title="Staff topic")
+            val = (dlg.get_input() or "").strip()
+            if val:
+                self._handler.set_topic(val)
+        except Exception:
+            return
+
+    def _update_debug_windows(self):
+        # Debug window
+        if self._debug_text and self._debug_win and self._debug_win.winfo_exists():
+            try:
+                self._debug_text.delete("1.0", "end")
+                self._debug_text.insert("end", "Latest engine result:\n")
+                self._debug_text.insert("end", f"{self._latest_result}\n\n")
+                if hasattr(self._handler, "get_status"):
+                    self._debug_text.insert("end", "Handler status:\n")
+                    self._debug_text.insert("end", f"{self._handler.get_status()}\n")
+            except Exception:
+                pass
+
+        # Log window
+        if self._log_text and self._log_win and self._log_win.winfo_exists():
+            try:
+                self._log_text.delete("1.0", "end")
+                if hasattr(self._handler, "get_event_log"):
+                    log = self._handler.get_event_log() or []
+                    for item in log[-120:]:
+                        self._log_text.insert("end", f"{item}\n")
+                else:
+                    self._log_text.insert("end", "No event log available for this mode.\n")
+            except Exception:
+                pass
 
     def _go_back(self, _event=None):
         self._running = False
         self._engine.stop()
+        if hasattr(self._handler, "close"):
+            try:
+                self._handler.close()
+            except Exception:
+                pass
         self.destroy()
         self._on_back()

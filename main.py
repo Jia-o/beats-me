@@ -2,9 +2,8 @@ import customtkinter as ctk
 
 import config
 from perception.hands import HandsEngine
-from perception.pose  import PoseEngine
-from modes.conductor_mode import ConductorMode
-from modes.focus_mode     import FocusMode
+from modes.personal_mode import PersonalMode
+from modes.staff_mode    import StaffMode
 from ui.selection_screen  import SelectionScreen
 from ui.camera_view       import CameraView
 
@@ -43,14 +42,14 @@ def main():
     def on_mode_selected(mode: str):
         root.withdraw()  # hide selection screen; keep Tk root alive
 
-        if mode == "conductor":
-            engine  = HandsEngine()
-            handler = ConductorMode(controller)
-            name    = "Conductor Mode"
-        elif mode == "focus":
-            engine  = PoseEngine()
-            handler = FocusMode(controller)
-            name    = "Focus Mode"
+        if mode == "personal":
+            engine = HandsEngine()
+            handler = PersonalMode(controller)
+            name = "Personal Mode"
+        elif mode == "staff":
+            engine = HandsEngine()
+            handler = StaffMode(controller)
+            name = "Staff Mode"
         else:
             root.deiconify()
             return

@@ -17,11 +17,20 @@ class MockSpotifyController:
     def previous_track(self):
         print("[Mock] ← Previous track")
 
+    def next_track_crossfade(self):
+        print("[Mock] → Next track (crossfade)")
+
+    def previous_track_crossfade(self):
+        print("[Mock] ← Previous track (crossfade)")
+
     def toggle_play(self):
         print("[Mock] ⏯  Toggle play/pause")
 
     def pause(self):
         print("[Mock] ⏸  Pause")
+
+    def set_volume(self, vol: int):
+        print(f"[Mock] 🔊 Set volume: {vol}%")
 
     def adjust_volume(self, delta: int):
         print(f"[Mock] 🔊 Volume {delta:+}%")
