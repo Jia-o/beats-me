@@ -8,7 +8,7 @@ class StaffMode:
     """
     Staff mode:
     - Plays from the staff playlist.
-    - Gesture controls: pinch (pause/play), swipe (skip), point (volume).
+    - Gesture controls: pinch (pause/play), V-shape (skip), point (volume).
     - Voice phrase pauses music for announcements, resumes when speech settles.
     """
 

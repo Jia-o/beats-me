@@ -20,7 +20,7 @@ gesture is being recognised:
   • "Pinch…"               – pinch gesture is building (not yet fired).
   • "Raising volume…"      – point-up is building.
   • "Lowering volume…"     – point-down is building.
-  • "Swiping…"             – swipe burst is in progress.
+  • "V left/right…"        – V-shape is building for next/previous track.
   • Confirmed command text – displayed in a distinct colour when the command fires.
 
 Dynamic Theme Border
@@ -55,7 +55,7 @@ _PENDING_LABELS: dict[str, tuple[str, tuple[int, int, int]]] = {
     "toggle_play": ("Pinch...",           (180, 255, 180)),
     "vol_up":      ("Raising volume...",  (100, 255, 200)),
     "vol_down":    ("Lowering volume...", (100, 200, 255)),
-    "swipe":       ("Swiping...",         (200, 200, 100)),
+    "v_shape":     ("V-shape...",         (200, 200, 100)),
 }
 
 _HAND_DETECTED_LABEL = ("Hand detected", (200, 200, 200))

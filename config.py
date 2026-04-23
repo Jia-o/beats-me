@@ -31,11 +31,6 @@ PINCH_THRESHOLD = 0.05
 # Pinch hold: consecutive frames the pinch must be held before firing
 PINCH_HOLD_FRAMES = 4
 
-# Swipe (burst detection, normalized by palm scale)
-SWIPE_BURST_MIN_DISPLACEMENT = 0.35
-SWIPE_BURST_MAX_DURATION_S = 0.55
-SWIPE_BURST_MIN_PEAK_V = 0.015
-
 # Cooldown between commands
 COMMAND_COOLDOWN_S = 1.25
 

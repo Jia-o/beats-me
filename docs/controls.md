@@ -62,24 +62,24 @@ Not supported in either mode. Use the hand pinch gesture.
 ### Skip to Next Track
 
 **Hand gesture**
-1. Hold your hand relaxed and open in front of the camera.  
-2. In one brisk, continuous motion, **sweep your whole hand to the right** — aim to travel roughly one-third of the camera frame width within about **0.5 seconds**.  
-3. Let your hand settle; the next track should begin after the crossfade (~450 ms).
+1. Hold your hand relaxed in front of the camera.
+2. Extend your **index and middle fingers upward** (forming a "V" or peace sign) while keeping your ring and pinky fingers curled down.
+3. **Hold the V-shape to the right side of the frame** (hand centroid past ~60 % of the frame width) for about **18 camera frames** (~0.6 s at 30 fps) — the next-track command fires after the crossfade (~450 ms).
 
-*The swipe is measured by wrist/palm centroid velocity. A slow drift will not trigger it — the motion must be quick and deliberate.*
+*The V-shape must be held in position, not swiped. Make sure your ring and pinky fingers remain clearly curled.*
 
 **Voice activation**  
-Not supported. Use the hand swipe gesture.
+Not supported. Use the V-shape hand gesture.
 
 ---
 
 ### Go to Previous Track
 
 **Hand gesture**  
-Same as "Skip to Next Track" but sweep your hand **to the left** instead.
+Same as "Skip to Next Track" but hold the V-shape on the **left side of the frame** (hand centroid below ~40 % of the frame width) instead.
 
 **Voice activation**  
-Not supported. Use the hand swipe gesture.
+Not supported. Use the V-shape hand gesture.
 
 ---
 
@@ -185,8 +185,8 @@ These keyboard shortcuts are available while the camera view is open:
 | Select a mode | Click "Select" button | ❌ Not available |
 | Return to mode selection | Press `M` key | ❌ Not available |
 | Play / Pause | Pinch (thumb + index tip) | ❌ Not available |
-| Skip to next track | Swipe right (quick) | ❌ Not available |
-| Go to previous track | Swipe left (quick) | ❌ Not available |
+| Skip to next track | V-shape right (hold) | ❌ Not available |
+| Go to previous track | V-shape left (hold) | ❌ Not available |
 | Volume up | Point index finger up, hold | ❌ Not available |
 | Volume down | Point index finger down, hold | ❌ Not available |
 | Volume ducking to 15 % *(Staff Mode)* | ❌ Not available | Any speech detected |
