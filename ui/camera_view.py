@@ -56,8 +56,6 @@ class CameraView(ctk.CTkToplevel):
         self.bind("<KeyPress-D>", lambda _e: self._toggle_debug())
         self.bind("<KeyPress-l>", lambda _e: self._toggle_log())
         self.bind("<KeyPress-L>", lambda _e: self._toggle_log())
-        self.bind("<KeyPress-t>", lambda _e: self._set_topic())
-        self.bind("<KeyPress-T>", lambda _e: self._set_topic())
         self.protocol("WM_DELETE_WINDOW", self._go_back)
 
         # Give the window a moment to render before starting the camera
@@ -81,7 +79,7 @@ class CameraView(ctk.CTkToplevel):
 
         self._hint_label = ctk.CTkLabel(
             bar,
-            text="Press  M  to return • D debug • L log • T topic (staff)",
+            text="Press  M  to return • D debug • L log",
             text_color="gray60",
         )
         self._hint_label.pack(pady=(10, 0))
@@ -173,20 +171,10 @@ class CameraView(ctk.CTkToplevel):
                 status.update(self._handler.get_status() or {})
 
             parts = []
-            if status.get("gesture_state"):
-                parts.append(f"hands: {status['gesture_state']}")
             if status.get("last_command"):
                 parts.append(f"cmd: {status['last_command']}")
-            if status.get("presence_paused"):
-                parts.append("auto-paused")
             if status.get("announcement_paused"):
                 parts.append("announcement-paused")
-            if status.get("topic"):
-                parts.append(f"topic: {status['topic']}")
-            if status.get("suggestions"):
-                s = status["suggestions"]
-                if isinstance(s, list) and s:
-                    parts.append("suggest: " + " · ".join(s[:2]))
 
             self._status_label.configure(text=" | ".join(parts))
         except Exception:
@@ -228,17 +216,6 @@ class CameraView(ctk.CTkToplevel):
         self._log_win = win
         self._log_text = txt
         self._update_debug_windows()
-
-    def _set_topic(self):
-        if not hasattr(self._handler, "set_topic"):
-            return
-        try:
-            dlg = ctk.CTkInputDialog(text="Set grading topic (e.g. recursion):", title="Staff topic")
-            val = (dlg.get_input() or "").strip()
-            if val:
-                self._handler.set_topic(val)
-        except Exception:
-            return
 
     def _update_debug_windows(self):
         # Debug window

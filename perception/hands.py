@@ -1,12 +1,12 @@
 """
-perception/hands.py – gesture recognition for Conductor Mode.
+perception/hands.py – gesture recognition.
 
 Gestures detected
 -----------------
 pinch       – thumb tip + index tip distance drops below threshold (toggle: fires
               once per close after PINCH_HOLD_FRAMES, resets when hand opens).
-left        – wrist moves left  > SWIPE_THRESHOLD over SWIPE_FRAMES frames.
-right       – wrist moves right > SWIPE_THRESHOLD over SWIPE_FRAMES frames.
+left        – wrist moves left  quickly (swipe).
+right       – wrist moves right quickly (swipe).
 up          – index finger extended upward, other fingers curled, held for
               POINT_HOLD_FRAMES then repeating every POINT_REPEAT_INTERVAL frames.
 down        – same but finger angled downward.
@@ -37,11 +37,8 @@ class HandsEngine(PerceptionEngine):
         super().__init__()
         self._landmarker = None
 
-        # Raw motion history (for wave + swipe)
+        # Raw motion history (for swipe)
         self._centroid_hist: deque = deque(maxlen=60)  # (t, x, y, scale)
-        self._wave_start_ts: float | None = None
-        self._wave_last_sign: int | None = None
-        self._wave_sign_changes = 0
 
         # Swipe latch (single-fire)
         self._swipe_active = False
@@ -49,9 +46,7 @@ class HandsEngine(PerceptionEngine):
         self._swipe_start_x: float | None = None
         self._swipe_peak_v = 0.0
 
-        # Gesture gating state machine
-        self._state: str = "standby"  # standby | active | cooldown
-        self._state_until_ts: float = 0.0
+        # Cooldown between commands
         self._cooldown_until_ts: float = 0.0
         self._last_command: str | None = None
 
@@ -65,19 +60,12 @@ class HandsEngine(PerceptionEngine):
 
     def _reset_gesture_state(self):
         self._centroid_hist.clear()
-        self._wave_start_ts = None
-        self._wave_last_sign = None
-        self._wave_sign_changes = 0
         self._swipe_active = False
         self._swipe_start_ts = None
         self._swipe_start_x = None
         self._swipe_peak_v = 0.0
-
-        self._state = "standby"
-        self._state_until_ts = 0.0
         self._cooldown_until_ts = 0.0
         self._last_command = None
-
         self._pinched = False
         self._pinch_frames = 0
         self._point_up_frames = 0
@@ -112,7 +100,6 @@ class HandsEngine(PerceptionEngine):
     def process_frame(self, frame):
         result = {
             "hand_present": False,
-            "gesture_state": self._state,
             "gesture": None,   # backward compat: mapped from command
             "command": None,   # canonical output
             "debug": {},
@@ -146,12 +133,10 @@ class HandsEngine(PerceptionEngine):
         raw = self._classify_raw(landmarks)
         command = self._gate_and_map(now, raw)
 
-        result["gesture_state"] = self._state
         result["command"] = command
         result["gesture"] = command  # legacy
         result["debug"] = {
             "raw": raw,
-            "state": self._state,
             "cooldown_until": self._cooldown_until_ts,
         }
         return annotated, result
@@ -162,7 +147,6 @@ class HandsEngine(PerceptionEngine):
 
     def get_status(self) -> dict:
         return {
-            "gesture_state": self._state,
             "last_command": self._last_command,
         }
 
@@ -248,66 +232,45 @@ class HandsEngine(PerceptionEngine):
 
         point_up = False
         point_down = False
-        point_up_long = False
         if not is_pinching:
             if self._point_up_frames >= config.POINT_HOLD_FRAMES:
                 elapsed = self._point_up_frames - config.POINT_HOLD_FRAMES
                 if elapsed == 0 or elapsed % config.POINT_REPEAT_INTERVAL == 0:
                     point_up = True
-                if self._point_up_frames >= (config.POINT_HOLD_FRAMES + 90):
-                    point_up_long = True
             if self._point_down_frames >= config.POINT_HOLD_FRAMES:
                 elapsed = self._point_down_frames - config.POINT_HOLD_FRAMES
                 if elapsed == 0 or elapsed % config.POINT_REPEAT_INTERVAL == 0:
                     point_down = True
-
-        wave = self._detect_wave()
 
         return {
             "pinch": pinch,
             "swipe": swipe,  # "left" | "right" | None
             "point_up": point_up,
             "point_down": point_down,
-            "point_up_long": point_up_long,
-            "wave": wave,
         }
 
-    def _detect_wave(self) -> bool:
-        """
-        Wave: deliberate left-right oscillation for ~WAVE_ARM_DURATION_S.
-        We look for multiple sign changes in the centroid x-velocity.
-        """
-        if len(self._centroid_hist) < 8:
-            return False
-        t2, x2, _, s2 = self._centroid_hist[-1]
-        t1, x1, _, s1 = self._centroid_hist[-2]
-        dt = max(1e-4, t2 - t1)
-        v = (x2 - x1) / dt
-        sign = 1 if v > 0 else (-1 if v < 0 else 0)
-        amp = abs(x2 - x1) / max(s2, s1, 1e-4)
+    def _gate_and_map(self, now: float, raw: dict) -> str | None:
+        """Apply cooldown gating and map raw gestures to commands."""
+        if now < self._cooldown_until_ts:
+            return None
 
-        if amp < 0.02:
-            return False
+        cmd = None
+        if raw.get("pinch"):
+            cmd = "toggle_play"
+        elif raw.get("swipe") == "right":
+            cmd = "next"
+        elif raw.get("swipe") == "left":
+            cmd = "prev"
+        elif raw.get("point_up"):
+            cmd = "vol_up"
+        elif raw.get("point_down"):
+            cmd = "vol_down"
 
-        if self._wave_start_ts is None:
-            self._wave_start_ts = t2
-            self._wave_last_sign = sign if sign != 0 else None
-            self._wave_sign_changes = 0
-            return False
-
-        if sign != 0 and self._wave_last_sign is not None and sign != self._wave_last_sign:
-            self._wave_sign_changes += 1
-            self._wave_last_sign = sign
-        elif self._wave_last_sign is None and sign != 0:
-            self._wave_last_sign = sign
-
-        if (t2 - self._wave_start_ts) >= config.WAVE_ARM_DURATION_S:
-            ok = self._wave_sign_changes >= 3
-            self._wave_start_ts = None
-            self._wave_last_sign = None
-            self._wave_sign_changes = 0
-            return bool(ok)
-        return False
+        if cmd:
+            self._last_command = cmd
+            self._cooldown_until_ts = now + config.COMMAND_COOLDOWN_S
+            return cmd
+        return None
 
     def _detect_swipe_burst(self) -> str | None:
         if len(self._centroid_hist) < 6:
@@ -348,51 +311,5 @@ class HandsEngine(PerceptionEngine):
             self._swipe_peak_v = 0.0
             return fired
 
-        return None
-
-    def _gate_and_map(self, now: float, raw: dict) -> str | None:
-        """
-        Standby -> Active is armed by a deliberate wave.
-        In Active: accept one command, then Cooldown, then Standby.
-        """
-        # state expiry
-        if self._state == "active" and now >= self._state_until_ts:
-            self._state = "standby"
-        if self._state == "cooldown" and now >= self._cooldown_until_ts:
-            self._state = "standby"
-
-        if self._state == "standby":
-            if raw.get("wave"):
-                self._state = "active"
-                self._state_until_ts = now + config.ACTIVE_WINDOW_S
-                return None
-            return None
-
-        if self._state == "active":
-            cmd = None
-            if raw.get("pinch"):
-                cmd = "toggle_play"
-            elif raw.get("swipe") == "right":
-                cmd = "next"
-            elif raw.get("swipe") == "left":
-                cmd = "prev"
-            elif raw.get("wave"):
-                # Macro gesture: a second deliberate wave while active
-                cmd = "cycle_playlist"
-            elif raw.get("point_up_long"):
-                cmd = "announcement_safe_volume"
-            elif raw.get("point_up"):
-                cmd = "vol_up"
-            elif raw.get("point_down"):
-                cmd = "vol_down"
-
-            if cmd:
-                self._last_command = cmd
-                self._state = "cooldown"
-                self._cooldown_until_ts = now + config.COMMAND_COOLDOWN_S
-                return cmd
-            return None
-
-        # cooldown
         return None
 
