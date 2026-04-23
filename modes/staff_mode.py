@@ -16,6 +16,7 @@ class StaffMode:
         self._last_command: str | None = None
         self._command_seq: int = 0
         self._is_playing: bool | None = None
+        self._staff_context_uri: str | None = None
 
         self._play_counts: dict[str, int] = {}
         self._track_titles: dict[str, str] = {}
@@ -23,7 +24,18 @@ class StaffMode:
         self._running = True
 
         if config.STAFF_PLAYLIST:
+            # Reset leaderboard on entry (avoid any bleed-over between modes).
+            self._play_counts.clear()
+            self._track_titles.clear()
+            self._last_track_id = None
             self._ctrl.play_playlist(config.STAFF_PLAYLIST)
+            # If available, compute the exact context uri we expect.
+            if hasattr(self._ctrl, "_normalize_playlist_id"):
+                try:
+                    pid = self._ctrl._normalize_playlist_id(config.STAFF_PLAYLIST)  # type: ignore[attr-defined]
+                    self._staff_context_uri = f"spotify:playlist:{pid}"
+                except Exception:
+                    self._staff_context_uri = None
 
         # Background poller to track "most played" while staff playlist is running.
         # Best-effort: if the controller can't provide track info, this stays empty.
@@ -37,13 +49,7 @@ class StaffMode:
         return
 
     def get_status(self) -> dict:
-        is_playing = None
-        if hasattr(self._ctrl, "is_music_playing"):
-            try:
-                is_playing = bool(self._ctrl.is_music_playing())
-            except Exception:
-                is_playing = None
-        self._is_playing = is_playing
+        # IMPORTANT: must stay fast; do not do network calls here.
         return {
             "mode": "staff",
             "playlist": config.STAFF_PLAYLIST,
@@ -104,7 +110,23 @@ class StaffMode:
                 else:
                     info = None
 
+                # Cache play/pause state (best effort).
+                if info and "is_playing" in info:
+                    self._is_playing = info.get("is_playing")
+                elif hasattr(self._ctrl, "is_music_playing"):
+                    try:
+                        self._is_playing = bool(self._ctrl.is_music_playing())
+                    except Exception:
+                        pass
+
                 if info and info.get("id") and info.get("name"):
+                    # Prevent "overflow": only count when Spotify playback context matches staff playlist.
+                    if self._staff_context_uri:
+                        ctx = info.get("context_uri")
+                        if ctx != self._staff_context_uri:
+                            time.sleep(1.0)
+                            continue
+
                     track_id = info["id"]
                     if track_id != self._last_track_id:
                         self._last_track_id = track_id
