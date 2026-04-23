@@ -14,18 +14,10 @@ import urllib.request
 # relative to this file's location).
 _MODELS_DIR = os.path.join(os.path.dirname(__file__), "..", "models")
 
-# Public download URLs for each model bundle.
+# Public download URL for the hand landmarker model bundle.
 HAND_MODEL_URL = (
     "https://storage.googleapis.com/mediapipe-models/"
     "hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task"
-)
-POSE_MODEL_URL = (
-    "https://storage.googleapis.com/mediapipe-models/"
-    "pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task"
-)
-FACE_MODEL_URL = (
-    "https://storage.googleapis.com/mediapipe-models/"
-    "face_landmarker/face_landmarker/float16/latest/face_landmarker.task"
 )
 
 
