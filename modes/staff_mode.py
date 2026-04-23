@@ -8,7 +8,6 @@ class StaffMode:
     Staff mode:
     - Plays from the staff playlist.
     - Gesture controls: pinch (pause/play), V-shape (skip), point (volume).
-    - Shush gesture (index finger over lips) mutes Spotify while active.
     """
 
     def __init__(self, controller):
@@ -16,30 +15,17 @@ class StaffMode:
         self._event_log: list[dict] = []
         self._last_command: str | None = None
 
-        self._mute_active = False
-        self._pre_mute_volume: int | None = None
-
         if config.STAFF_PLAYLIST:
             self._ctrl.play_playlist(config.STAFF_PLAYLIST)
 
     # ---------------------------- public hooks ----------------------------
 
     def close(self):
-        # Ensure we never leave Spotify muted when exiting the mode.
-        try:
-            if self._mute_active:
-                self._mute_active = False
-                if hasattr(self._ctrl, "gesture_mute_release"):
-                    self._ctrl.gesture_mute_release()
-                elif self._pre_mute_volume is not None:
-                    self._ctrl.set_volume(self._pre_mute_volume)
-        except Exception:
-            pass
+        return
 
     def get_status(self) -> dict:
         return {
             "mode": "staff",
-            "mute_active": self._mute_active,
             "playlist": config.STAFF_PLAYLIST,
             "last_command": self._last_command,
         }
@@ -58,28 +44,6 @@ class StaffMode:
             self._last_command = command
             self._log("command", {"command": command})
             self._handle_command(command)
-
-        if result.get("shush_tap"):
-            if not self._mute_active:
-                self._mute_active = True
-                self._log("mute_start", {"reason": "shush_tap"})
-                if hasattr(self._ctrl, "gesture_mute_start"):
-                    self._ctrl.gesture_mute_start()
-                else:
-                    # Fallback path: save volume (if possible) then mute.
-                    if hasattr(self._ctrl, "get_current_volume"):
-                        try:
-                            self._pre_mute_volume = self._ctrl.get_current_volume()
-                        except Exception:
-                            self._pre_mute_volume = None
-                    self._ctrl.set_volume(0)
-            else:
-                self._mute_active = False
-                self._log("mute_release", {"reason": "shush_tap"})
-                if hasattr(self._ctrl, "gesture_mute_release"):
-                    self._ctrl.gesture_mute_release()
-                elif self._pre_mute_volume is not None:
-                    self._ctrl.set_volume(self._pre_mute_volume)
 
     # ---------------------------- internals ----------------------------
 

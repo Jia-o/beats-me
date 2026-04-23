@@ -11,7 +11,7 @@ beats-me has two modes, each activated from the launch screen that appears when 
 | Mode | Playlist | Hand controls | Voice controls |
 |---|---|---|---|
 | **Personal Mode** | Your personal playlist | ✅ Full gesture set | ❌ Not available |
-| **Staff Mode** | Staff playlist | ✅ Full gesture set | ✅ Announcement pause/resume |
+| **Staff Mode** | Staff playlist | ✅ Full gesture set | ❌ Not available |
 
 ---
 
@@ -107,64 +107,6 @@ Not supported. Use the hand pointing gesture.
 
 ---
 
-## Announcement Pause / Resume (Staff Mode only)
-
-Staff Mode listens continuously for speech via the microphone using offline speech recognition ([Vosk](https://alphacephei.com/vosk/)). No push-to-talk button is needed — it is always listening.
-
-There are two voice-driven behaviours that layer on top of each other:
-
-1. **Volume Ducking** – fires on *any* detected speech.
-2. **Announcement Pause** – fires only when a specific trigger phrase is recognised.
-
-### Voice activation
-
-**Prerequisites (one-time setup)**
-
-1. Download a Vosk speech model for your language, e.g.  
-   [`vosk-model-small-en-us-0.15`](https://alphacephei.com/vosk/models) (~40 MB).  
-2. Unzip the model folder somewhere on disk (e.g. `models/vosk-model-small-en-us-0.15`).  
-3. Open `config.py` and set `VOSK_MODEL_PATH` to that folder path:
-   ```python
-   VOSK_MODEL_PATH = "models/vosk-model-small-en-us-0.15"
-   ```
-4. Make sure the `vosk` and `sounddevice` packages are installed:
-   ```bash
-   pip install vosk sounddevice
-   ```
-5. Grant the app access to your microphone when your OS prompts for permission (or pre-allow it in System Settings → Privacy → Microphone).
-
-**Volume Ducking (any speech)**
-
-Whenever the microphone picks up any speech:
-- Volume **immediately drops to 15 %**.
-- Once you **stop speaking** (approximately **1.7 seconds of silence**), the volume **smoothly recovers** to the level it was at before ducking — incrementing **+5 % every 200 ms** for a professional fade-in effect.
-
-**Announcement Pause (trigger phrase)**
-
-If you say one of the configured trigger phrases:
-
-- **"everyone listen up for a sec"**
-- **"everyone listen up"**
-
-the music **pauses** completely (it will already be at 15 % from ducking). After approximately **1.7 seconds of silence**, music **resumes** and the volume **smoothly recovers** to its original level.
-
-The system performs a simple substring match, so you do not need to say the phrase in isolation — it can be part of a longer sentence.
-
-**What if voice is not working?**
-
-If `VOSK_MODEL_PATH` is not set or the `vosk`/`sounddevice` packages are missing, the voice feature silently disables itself. A message is printed to the console:
-
-```
-[voice] announcement listener disabled: VOSK_MODEL_PATH not set in config.py
-```
-
-In that case, Staff Mode still works with hand gestures only.
-
-### Hand activation  
-There is no hand gesture equivalent for announcement pause/resume — this feature is **voice-only**.
-
----
-
 ## Debug and Developer Tools
 
 These keyboard shortcuts are available while the camera view is open:
@@ -189,9 +131,5 @@ These keyboard shortcuts are available while the camera view is open:
 | Go to previous track | V-shape left (hold) | ❌ Not available |
 | Volume up | Point index finger up, hold | ❌ Not available |
 | Volume down | Point index finger down, hold | ❌ Not available |
-| Volume ducking to 15 % *(Staff Mode)* | ❌ Not available | Any speech detected |
-| Smooth volume recovery *(Staff Mode)* | ❌ Not available | Silence for ~1.7 s |
-| Announcement pause *(Staff Mode)* | ❌ Not available | Say trigger phrase |
-| Announcement resume + recover *(Staff Mode)* | ❌ Not available | Silence for ~1.7 s |
 | Debug panel | Press `D` key | ❌ Not available |
 | Event log panel | Press `L` key | ❌ Not available |

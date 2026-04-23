@@ -24,13 +24,7 @@ class SpotifyController:
             )
         )
 
-        # Duck / smooth-recover state
-        self._pre_duck_volume: int | None = None
-        self._recover_token: int = 0
-
-        # Mute (gesture) state
-        self._pre_mute_volume: int | None = None
-        self._mute_active: bool = False
+        # (announcement/mute features removed)
 
         # Dynamic theme state
         self._theme_color: tuple[int, int, int] = (180, 180, 180)  # neutral gray BGR
@@ -67,13 +61,6 @@ class SpotifyController:
         if playback and playback.get("device") and playback["device"].get("volume_percent") is not None:
             return int(playback["device"]["volume_percent"])
         return None
-
-    def get_current_volume(self) -> int | None:
-        """Public accessor for current device volume, if available."""
-        try:
-            return self._current_volume()
-        except Exception:
-            return None
 
     def is_music_playing(self) -> bool:
         try:
@@ -217,89 +204,6 @@ class SpotifyController:
             self._sp.start_playback,
             context_uri=f"spotify:playlist:{playlist_id}",
         )
-
-    # ------------------------------------------------------------------
-    # Volume ducking and smooth recovery
-    # ------------------------------------------------------------------
-
-    def duck_volume(self, target: int = config.DUCK_TARGET_VOLUME):
-        """Save current volume and immediately drop to *target* percent."""
-        print(f"[Spotify] Duck volume → {target}%")
-
-        def _do_duck():
-            try:
-                vol = self._current_volume()
-                if vol is not None:
-                    self._pre_duck_volume = vol
-                self._set_volume(target)
-            except SpotifyException as exc:
-                self._handle_exc(exc)
-
-        threading.Thread(target=_do_duck, daemon=True).start()
-
-    def smooth_recover_volume(self):
-        """Gradually restore volume to the level saved by duck_volume (3 s fade-in)."""
-        target = self._pre_duck_volume
-        if target is None:
-            return
-        print(f"[Spotify] Smooth volume recovery → {target}%")
-        # Bump token to cancel any ongoing recovery thread.
-        self._recover_token += 1
-        token = self._recover_token
-        self._dispatch(self._do_smooth_recover, target, token)
-
-    def _do_smooth_recover(self, target: int, token: int):
-        try:
-            current = self._current_volume()
-            if current is None:
-                return
-            vol = current
-            while vol < target:
-                if self._recover_token != token:
-                    return  # cancelled by a newer call
-                vol = min(vol + config.SMOOTH_RECOVER_STEP, target)
-                self._set_volume(vol)
-                time.sleep(config.SMOOTH_RECOVER_INTERVAL_S)
-        except SpotifyException as exc:
-            self._handle_exc(exc)
-
-    # ------------------------------------------------------------------
-    # Gesture mute (shush)
-    # ------------------------------------------------------------------
-
-    def gesture_mute_start(self):
-        """Save current volume and set Spotify volume to 0."""
-        if self._mute_active:
-            return
-        self._mute_active = True
-
-        def _do():
-            try:
-                vol = self._current_volume()
-                if vol is not None and vol > 0:
-                    self._pre_mute_volume = vol
-                self._set_volume(0)
-            except SpotifyException as exc:
-                self._handle_exc(exc)
-
-        threading.Thread(target=_do, daemon=True).start()
-
-    def gesture_mute_release(self):
-        """Restore volume to the value saved by gesture_mute_start (if any)."""
-        if not self._mute_active:
-            return
-        self._mute_active = False
-        target = self._pre_mute_volume
-        if target is None:
-            return
-
-        def _do():
-            try:
-                self._set_volume(target)
-            except SpotifyException as exc:
-                self._handle_exc(exc)
-
-        threading.Thread(target=_do, daemon=True).start()
 
     # ------------------------------------------------------------------
     # Dynamic theming
