@@ -227,7 +227,7 @@ class CameraView(ctk.CTkToplevel):
 
                 # ── Dynamic Theme Border ──────────────────────────────────────
                 h, w = display.shape[:2]
-                cv2.rectangle(display, (0, 0), (w - 1, h - 1), self._theme_color, 8)
+                cv2.rectangle(display, (0, 0), (w - 1, h - 1), self._theme_color, 18)
 
                 rgb = cv2.cvtColor(display, cv2.COLOR_BGR2RGB)
                 img = Image.fromarray(rgb)

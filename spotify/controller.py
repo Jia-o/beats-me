@@ -1,5 +1,7 @@
 import threading
 import time
+import colorsys
+import hashlib
 
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -287,28 +289,42 @@ class SpotifyController:
         """Daemon thread: detect song changes and update the cached theme color."""
         while True:
             try:
-                track_id = self._current_track_id()
+                snap = self._get_playback_snapshot() or {}
+                track_id = snap.get("track_id")
                 if track_id and track_id != self._last_track_id:
                     self._last_track_id = track_id
-                    features = self._sp.audio_features([track_id])
-                    if features and features[0]:
-                        valence = features[0].get("valence", 0.5)
-                        energy = features[0].get("energy", 0.5)
-                        color = self._map_to_color(valence, energy)
-                        with self._theme_lock:
-                            self._theme_color = color
+                    color = None
+                    try:
+                        features = self._sp.audio_features([track_id])
+                        if features and features[0]:
+                            valence = features[0].get("valence", 0.5)
+                            energy = features[0].get("energy", 0.5)
+                            color = self._map_to_color(valence, energy)
+                    except Exception:
+                        color = None
+
+                    # Fallback: if audio_features fails, still show a non-grey stable color per track.
+                    if not color:
+                        color = self._fallback_color(track_id)
+
+                    with self._theme_lock:
+                        self._theme_color = color
             except Exception:
                 pass
             time.sleep(config.THEME_POLL_INTERVAL_S)
 
-    def _current_track_id(self) -> str | None:
-        try:
-            playback = self._sp.current_playback()
-            if playback and playback.get("item"):
-                return playback["item"].get("id")
-        except Exception:
-            pass
-        return None
+    @staticmethod
+    def _fallback_color(track_id: str) -> tuple[int, int, int]:
+        """
+        Stable, bright-ish BGR color derived from track_id.
+        Used when Spotify audio_features is unavailable.
+        """
+        digest = hashlib.md5(track_id.encode("utf-8")).digest()
+        hue = digest[0] / 255.0  # 0..1
+        sat = 0.85
+        val = 0.95
+        r, g, b = colorsys.hsv_to_rgb(hue, sat, val)
+        return (int(b * 255), int(g * 255), int(r * 255))
 
     @staticmethod
     def _map_to_color(valence: float, energy: float) -> tuple[int, int, int]:
