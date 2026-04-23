@@ -39,6 +39,53 @@ class SpotifyController:
     # ------------------------------------------------------------------
 
     @staticmethod
+    def _normalize_playlist_id(playlist_id: str) -> str:
+        """
+        Accepts:
+        - raw playlist id: "7B1tUsr6cwRpSAlqa8BoTy"
+        - id with query params: "7B1tUsr6cwRpSAlqa8BoTy?si=..."
+        - playlist URL: "https://open.spotify.com/playlist/<id>?si=..."
+        - uri: "spotify:playlist:<id>"
+        Returns the bare playlist id.
+        """
+        pid = (playlist_id or "").strip()
+        if pid.startswith("spotify:playlist:"):
+            pid = pid.split("spotify:playlist:", 1)[1]
+        if "open.spotify.com/playlist/" in pid:
+            pid = pid.split("open.spotify.com/playlist/", 1)[1]
+        pid = pid.split("?", 1)[0].split("#", 1)[0].strip().strip("/")
+        return pid
+
+    def _get_playback_snapshot(self) -> dict | None:
+        """
+        Single best-effort call to current_playback(); returned dict:
+          {"is_playing": bool|None, "track_id": str|None, "track_name": str|None,
+           "artists": str, "context_uri": str|None}
+        """
+        try:
+            playback = self._sp.current_playback()
+            if not playback:
+                return {"is_playing": None, "track_id": None, "track_name": None, "artists": "", "context_uri": None}
+
+            item = playback.get("item") or {}
+            track_id = item.get("id")
+            name = item.get("name")
+            artists = item.get("artists") or []
+            artist_names = ", ".join([a.get("name", "") for a in artists if a.get("name")])
+            context = playback.get("context") or {}
+            context_uri = context.get("uri")
+            is_playing = playback.get("is_playing")
+            return {
+                "is_playing": bool(is_playing) if isinstance(is_playing, bool) else None,
+                "track_id": track_id,
+                "track_name": name,
+                "artists": artist_names,
+                "context_uri": context_uri,
+            }
+        except Exception:
+            return None
+
+    @staticmethod
     def _handle_exc(exc: SpotifyException):
         if "No active device" in str(exc):
             print("[Spotify] No active device found – open Spotify on any device first.")
@@ -64,8 +111,8 @@ class SpotifyController:
 
     def is_music_playing(self) -> bool:
         try:
-            playback = self._sp.current_playback()
-            return bool(playback and playback.get("is_playing"))
+            snap = self._get_playback_snapshot()
+            return bool(snap and snap.get("is_playing"))
         except Exception:
             return False
 
@@ -77,17 +124,16 @@ class SpotifyController:
         or None if unavailable.
         """
         try:
-            playback = self._sp.current_playback()
-            if not playback or not playback.get("item"):
+            snap = self._get_playback_snapshot()
+            if not snap or not snap.get("track_id") or not snap.get("track_name"):
                 return None
-            item = playback["item"] or {}
-            track_id = item.get("id")
-            name = item.get("name")
-            artists = item.get("artists") or []
-            artist_names = ", ".join([a.get("name", "") for a in artists if a.get("name")])
-            if not track_id or not name:
-                return None
-            return {"id": track_id, "name": name, "artists": artist_names}
+            return {
+                "id": snap["track_id"],
+                "name": snap["track_name"],
+                "artists": snap.get("artists", ""),
+                "context_uri": snap.get("context_uri"),
+                "is_playing": snap.get("is_playing"),
+            }
         except Exception:
             return None
 
@@ -221,10 +267,11 @@ class SpotifyController:
         threading.Thread(target=_set_vol, daemon=True).start()
 
     def play_playlist(self, playlist_id: str):
-        print(f"[Spotify] 🎵 Play playlist: {playlist_id}")
+        pid = self._normalize_playlist_id(playlist_id)
+        print(f"[Spotify] 🎵 Play playlist: {pid}")
         self._dispatch(
             self._sp.start_playback,
-            context_uri=f"spotify:playlist:{playlist_id}",
+            context_uri=f"spotify:playlist:{pid}",
         )
 
     # ------------------------------------------------------------------
