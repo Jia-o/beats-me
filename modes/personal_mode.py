@@ -14,6 +14,7 @@ class PersonalMode:
         self._ctrl = controller
         self._event_log: list[dict] = []
         self._last_command: str | None = None
+        self._command_seq: int = 0
 
         if config.PERSONAL_PLAYLIST:
             self._ctrl.play_playlist(config.PERSONAL_PLAYLIST)
@@ -28,6 +29,7 @@ class PersonalMode:
             "mode": "personal",
             "playlist": config.PERSONAL_PLAYLIST,
             "last_command": self._last_command,
+            "command_seq": self._command_seq,
         }
 
     def get_event_log(self) -> list[dict]:
@@ -42,6 +44,7 @@ class PersonalMode:
         command = result.get("command")
         if command:
             self._last_command = command
+            self._command_seq += 1
             self._log("command", {"command": command})
             self._handle_command(command)
 
