@@ -80,6 +80,7 @@ class VibeHandsEngine(PerceptionEngine):
             base_options=_BaseOptions(model_asset_path=seg_model_path),
             running_mode=_RunningMode.IMAGE,
             output_category_mask=True,
+            output_confidence_masks=True,
         )
         self.segmenter = _ImageSegmenter.create_from_options(seg_options)
 
@@ -154,11 +155,20 @@ class VibeHandsEngine(PerceptionEngine):
         rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
         mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
         seg = self.segmenter.segment(mp_img)
-        mask = seg.category_mask.numpy_view()
+        alpha = None
 
-        # category_mask is a 2D uint8-ish array. For selfie_segmenter it's binary-ish:
-        # 0 = background, 1 = person.
-        alpha = (mask.astype(np.float32) > 0.5).astype(np.float32)
+        # Prefer confidence mask (per-pixel probability) when available.
+        try:
+            if getattr(seg, "confidence_masks", None):
+                # For selfie segmenter, index 0 corresponds to the person class.
+                alpha = seg.confidence_masks[0].numpy_view().astype(np.float32)
+        except Exception:
+            alpha = None
+
+        if alpha is None:
+            # Fallback: category mask (per-pixel class index).
+            mask = seg.category_mask.numpy_view()
+            alpha = (mask.astype(np.float32) > 0.5).astype(np.float32)
 
         # Edge smoothing to reduce flicker/jitter.
         alpha = cv2.GaussianBlur(alpha, (0, 0), sigmaX=config.SEG_EDGE_BLUR_SIGMA, sigmaY=config.SEG_EDGE_BLUR_SIGMA)

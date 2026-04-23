@@ -13,7 +13,7 @@ SPOTIPY_REDIRECT_URI = os.getenv("SPOTIPY_REDIRECT_URI")
 # ---------------------------------------------------------------------------
 # Playlist IDs – replace these with real Spotify playlist IDs
 # ---------------------------------------------------------------------------
-PERSONAL_PLAYLIST = "7B1tUsr6cwRpSAlqa8BoTy?si=41dd9e829bd141d8"  # Personal mode playlist
+PERSONAL_PLAYLIST = "4i0lx0ZRyMZWWBDgedWy9c?si=4299d7a96ab34c58&pt=d2868ae74d5799f0e9a1e97cc1f46361"  # Personal mode playlist
 STAFF_PLAYLIST    = "7B1tUsr6cwRpSAlqa8BoTy?si=41dd9e829bd141d8"  # Staff mode playlist
 
 # ---------------------------------------------------------------------------
@@ -46,21 +46,6 @@ VOLUME_STEP = 5
 CROSSFADE_MS = 450
 CROSSFADE_TARGET_VOLUME_DROP = 35  # percentage points (max)
 
-# Staff voice announcements (Vosk)
-VOSK_MODEL_PATH = ""  # set to a local Vosk model folder path (e.g. "models/vosk-model-small-en-us-0.15")
-VOICE_SAMPLE_RATE = 16000
-VOICE_BLOCK_SIZE = 4000
-STAFF_ANNOUNCEMENT_PHRASES = [
-    "everyone listen up for a sec",
-    "everyone listen up",
-]
-ANNOUNCEMENT_END_SILENCE_S = 1.7
-
-# Volume ducking / smooth recovery (Staff Mode voice)
-DUCK_TARGET_VOLUME = 15          # % to drop to immediately when voice is detected
-SMOOTH_RECOVER_STEP = 5          # % added per tick during fade-in
-SMOOTH_RECOVER_INTERVAL_S = 0.2  # seconds between ticks (~3 s total for a 30-point climb)
-
 # Dynamic theming – audio_features thresholds and timing
 THEME_POLL_INTERVAL_S = 5       # how often the background thread checks for a new track
 THEME_ENERGY_THRESHOLD = 0.6    # energy above this = "high energy" quadrant
@@ -85,11 +70,4 @@ SEG_TEMPORAL_SMOOTH_ALPHA = 0.35
 
 # Album art fetch caching (seconds).
 ALBUM_ART_CACHE_S = 12.0
-
-# ---------------------------------------------------------------------------
-# "Shush" gesture (index finger over lips) for Staff Mode
-# ---------------------------------------------------------------------------
-# Normalized thresholds in face/hand coordinate space.
-SHUSH_MOUTH_X_THRESH = 0.055
-SHUSH_MOUTH_Y_THRESH = 0.060
 

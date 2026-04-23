@@ -38,12 +38,6 @@ class MockSpotifyController:
     def play_playlist(self, playlist_id: str):
         print(f"[Mock] 🎵 Play playlist: {playlist_id}")
 
-    def duck_volume(self, target: int = 15):
-        print(f"[Mock] Duck volume → {target}%")
-
-    def smooth_recover_volume(self):
-        print("[Mock] Smooth volume recovery")
-
     def get_theme_color(self) -> tuple:
         return (180, 180, 180)  # neutral gray BGR
 
@@ -51,13 +45,4 @@ class MockSpotifyController:
         return False
 
     def get_album_art_url(self) -> str | None:
-        return None
-
-    def gesture_mute_start(self):
-        print("[Mock] 🔇 Gesture mute start (volume -> 0)")
-
-    def gesture_mute_release(self):
-        print("[Mock] 🔊 Gesture mute release (restore previous)")
-
-    def get_current_volume(self) -> int | None:
         return None
