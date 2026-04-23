@@ -45,7 +45,7 @@ POINT_HOLD_FRAMES = 18
 POINT_REPEAT_INTERVAL = 45
 
 # Volume step per point trigger (percentage points, signed by direction)
-VOLUME_STEP = 3
+VOLUME_STEP = 5
 
 # Crossfade
 CROSSFADE_MS = 450
