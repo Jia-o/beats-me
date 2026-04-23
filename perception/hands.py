@@ -2,7 +2,6 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import time
-from collections import deque
 
 from .engine import PerceptionEngine
 from ._models import ensure_model, HAND_MODEL_URL
@@ -40,7 +39,7 @@ class HandsEngine(PerceptionEngine):
         self.cooldown = 0.0
         self.prev = None
 
-    def onStart(self):
+    def _on_start(self):
         model_path = ensure_model(HAND_MODEL_URL, "hand_landmarker.task")
         options = _HandLandmarkerOptions(
             base_options=_BaseOptions(model_asset_path=model_path),
@@ -53,7 +52,7 @@ class HandsEngine(PerceptionEngine):
         self.landmarker = _HandLandmarker.create_from_options(options)
         self.resetGestures()
 
-    def onStop(self):
+    def _on_stop(self):
         if self.landmarker:
             self.landmarker.close()
             self.landmarker = None
@@ -91,7 +90,7 @@ class HandsEngine(PerceptionEngine):
 
     def classify(self, lms) -> dict:
         thumbTip, indexTip, middleTip, ringTip, pinkyTip = lms[4], lms[8], lms[12], lms[16], lms[20]
-        thumbMid, indexMid, middleMid, ringMid, pinkyMid = lms[5], lms[9], lms[13], lms[17]
+        indexMid, middleMid, ringMid, pinkyMid = lms[5], lms[9], lms[13], lms[17]
 
         cx = sum(p.x for p in [lms[i] for i in (0, 5, 9, 13, 17)]) / 5
 

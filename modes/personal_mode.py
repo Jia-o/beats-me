@@ -7,7 +7,7 @@ class PersonalMode:
     """
     Personal mode:
     - Plays from the personal playlist.
-    - Gesture controls: pinch (pause/play), swipe (skip), point (volume).
+    - Gesture controls: pinch (pause/play), V-shape (skip), point (volume).
     """
 
     def __init__(self, controller):
