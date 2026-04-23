@@ -109,7 +109,12 @@ Not supported. Use the hand pointing gesture.
 
 ## Announcement Pause / Resume (Staff Mode only)
 
-Staff Mode listens continuously for a spoken trigger phrase via the microphone using offline speech recognition ([Vosk](https://alphacephei.com/vosk/)). No push-to-talk button or wake word is needed — it is always listening.
+Staff Mode listens continuously for speech via the microphone using offline speech recognition ([Vosk](https://alphacephei.com/vosk/)). No push-to-talk button is needed — it is always listening.
+
+There are two voice-driven behaviours that layer on top of each other:
+
+1. **Volume Ducking** – fires on *any* detected speech.
+2. **Announcement Pause** – fires only when a specific trigger phrase is recognised.
 
 ### Voice activation
 
@@ -128,20 +133,22 @@ Staff Mode listens continuously for a spoken trigger phrase via the microphone u
    ```
 5. Grant the app access to your microphone when your OS prompts for permission (or pre-allow it in System Settings → Privacy → Microphone).
 
-**To pause music for an announcement**
+**Volume Ducking (any speech)**
 
-Say one of the following phrases clearly and at a normal speaking volume near your microphone:
+Whenever the microphone picks up any speech:
+- Volume **immediately drops to 15 %**.
+- Once you **stop speaking** (approximately **1.7 seconds of silence**), the volume **smoothly recovers** to the level it was at before ducking — incrementing **+5 % every 200 ms** for a professional fade-in effect.
+
+**Announcement Pause (trigger phrase)**
+
+If you say one of the configured trigger phrases:
 
 - **"everyone listen up for a sec"**
 - **"everyone listen up"**
 
-The system performs a simple substring match, so you do not need to say the phrase in isolation — it can be part of a longer sentence. Music pauses as soon as the phrase is recognized.
+the music **pauses** completely (it will already be at 15 % from ducking). After approximately **1.7 seconds of silence**, music **resumes** and the volume **smoothly recovers** to its original level.
 
-**To resume music**
-
-Simply **stop speaking** (or stop making noise near the microphone). After approximately **1.7 seconds of silence**, the listener detects the end of the announcement and music resumes automatically.
-
-*There is no voice command to explicitly resume — silence is the signal.*
+The system performs a simple substring match, so you do not need to say the phrase in isolation — it can be part of a longer sentence.
 
 **What if voice is not working?**
 
@@ -182,7 +189,9 @@ These keyboard shortcuts are available while the camera view is open:
 | Go to previous track | Swipe left (quick) | ❌ Not available |
 | Volume up | Point index finger up, hold | ❌ Not available |
 | Volume down | Point index finger down, hold | ❌ Not available |
+| Volume ducking to 15 % *(Staff Mode)* | ❌ Not available | Any speech detected |
+| Smooth volume recovery *(Staff Mode)* | ❌ Not available | Silence for ~1.7 s |
 | Announcement pause *(Staff Mode)* | ❌ Not available | Say trigger phrase |
-| Announcement resume *(Staff Mode)* | ❌ Not available | Silence for ~1.7 s |
+| Announcement resume + recover *(Staff Mode)* | ❌ Not available | Silence for ~1.7 s |
 | Debug panel | Press `D` key | ❌ Not available |
 | Event log panel | Press `L` key | ❌ Not available |

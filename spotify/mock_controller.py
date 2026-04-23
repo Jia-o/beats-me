@@ -37,3 +37,12 @@ class MockSpotifyController:
 
     def play_playlist(self, playlist_id: str):
         print(f"[Mock] 🎵 Play playlist: {playlist_id}")
+
+    def duck_volume(self, target: int = 15):
+        print(f"[Mock] Duck volume → {target}%")
+
+    def smooth_recover_volume(self):
+        print("[Mock] Smooth volume recovery")
+
+    def get_theme_color(self) -> tuple:
+        return (180, 180, 180)  # neutral gray BGR

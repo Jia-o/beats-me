@@ -11,6 +11,22 @@ Architecture
   so the camera thread only calls mode_handler.handle(), which is fast.
 
 Press M (or m) to stop the camera and return to the mode-selection screen.
+
+Visual Feedback Overlay
+-----------------------
+A HUD line is rendered directly onto the OpenCV frame to show the user what
+gesture is being recognised:
+  • "Hand detected"        – a hand is visible but no gesture is building yet.
+  • "Pinch…"               – pinch gesture is building (not yet fired).
+  • "Raising volume…"      – point-up is building.
+  • "Lowering volume…"     – point-down is building.
+  • "Swiping…"             – swipe burst is in progress.
+  • Confirmed command text – displayed in a distinct colour when the command fires.
+
+Dynamic Theme Border
+--------------------
+The camera frame border changes colour to reflect the current track's mood
+(valence × energy from Spotify audio_features). Updated every 5 seconds.
 """
 
 import queue
@@ -22,6 +38,28 @@ import customtkinter as ctk
 from PIL import Image
 
 import config
+
+# ---------------------------------------------------------------------------
+# HUD overlay label tables  (BGR colours for cv2.putText)
+# ---------------------------------------------------------------------------
+
+_COMMAND_LABELS: dict[str, tuple[str, tuple[int, int, int]]] = {
+    "toggle_play": ("Play / Pause",  (100, 255, 100)),
+    "next":        ("Next Track >>", (255, 200, 100)),
+    "prev":        ("<< Prev Track", (255, 200, 100)),
+    "vol_up":      ("Volume Up",     (80,  255, 180)),
+    "vol_down":    ("Volume Down",   (80,  180, 255)),
+}
+
+_PENDING_LABELS: dict[str, tuple[str, tuple[int, int, int]]] = {
+    "toggle_play": ("Pinch...",           (180, 255, 180)),
+    "vol_up":      ("Raising volume...",  (100, 255, 200)),
+    "vol_down":    ("Lowering volume...", (100, 200, 255)),
+    "swipe":       ("Swiping...",         (200, 200, 100)),
+}
+
+_HAND_DETECTED_LABEL = ("Hand detected", (200, 200, 200))
+_NO_OVERLAY = ("", (0, 0, 0))  # returned when there is nothing to display
 
 
 class CameraView(ctk.CTkToplevel):
@@ -46,6 +84,11 @@ class CameraView(ctk.CTkToplevel):
         self._debug_text = None
         self._log_win = None
         self._log_text = None
+
+        # Dynamic theme: border colour updated from controller audio_features.
+        # Stored as a BGR tuple; written only from the Tk main thread.
+        self._theme_color: tuple[int, int, int] = (180, 180, 180)
+        self._last_theme_update: float = 0.0
 
         self._build_ui()
 
@@ -132,6 +175,20 @@ class CameraView(ctk.CTkToplevel):
                         self._handler.handle(action_key)
 
                 display = cv2.resize(annotated, (self.DISPLAY_W, self.DISPLAY_H))
+
+                # ── Visual Feedback Overlay ──────────────────────────────────
+                overlay_text, overlay_color = self._get_overlay_info(self._latest_result)
+                if overlay_text:
+                    cv2.putText(
+                        display, overlay_text,
+                        (12, 38), cv2.FONT_HERSHEY_SIMPLEX, 1.0,
+                        overlay_color, 2, cv2.LINE_AA,
+                    )
+
+                # ── Dynamic Theme Border ──────────────────────────────────────
+                h, w = display.shape[:2]
+                cv2.rectangle(display, (0, 0), (w - 1, h - 1), self._theme_color, 8)
+
                 rgb = cv2.cvtColor(display, cv2.COLOR_BGR2RGB)
                 img = Image.fromarray(rgb)
 
@@ -145,7 +202,7 @@ class CameraView(ctk.CTkToplevel):
         """Checks the queue for new frames and updates the UI label."""
         if not self._running:
             return
-            
+
         try:
             img = self._frame_q.get_nowait()
             ctk_img = ctk.CTkImage(
@@ -154,13 +211,45 @@ class CameraView(ctk.CTkToplevel):
                 size=(self.DISPLAY_W, self.DISPLAY_H),
             )
             self._video_label.configure(image=ctk_img)
-            self._video_label.image = ctk_img 
+            self._video_label.image = ctk_img
         except queue.Empty:
             pass
+
+        # Refresh theme colour from controller every THEME_UPDATE_INTERVAL_S seconds.
+        now = time.time()
+        if now - self._last_theme_update >= config.THEME_UPDATE_INTERVAL_S:
+            self._last_theme_update = now
+            self._refresh_theme_color()
 
         # Schedule next check in ~30ms (aiming for 30-60 FPS UI updates)
         self._update_status()
         self.after(30, self._poll_frame)
+
+    def _refresh_theme_color(self):
+        """Ask the mode handler for the latest theme color and cache it."""
+        try:
+            if hasattr(self._handler, "get_theme_color"):
+                color = self._handler.get_theme_color()
+                if color:
+                    self._theme_color = color
+        except Exception:
+            pass
+
+    @staticmethod
+    def _get_overlay_info(result: dict) -> tuple[str, tuple[int, int, int]]:
+        """Return (hud_text, bgr_color) for the frame overlay, or ('', ...) for none."""
+        command = result.get("command")
+        if command and command in _COMMAND_LABELS:
+            return _COMMAND_LABELS[command]
+
+        pending = (result.get("debug") or {}).get("pending")
+        if pending and pending in _PENDING_LABELS:
+            return _PENDING_LABELS[pending]
+
+        if result.get("hand_present"):
+            return _HAND_DETECTED_LABEL
+
+        return _NO_OVERLAY
 
     def _update_status(self):
         try:

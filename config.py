@@ -61,6 +61,17 @@ STAFF_ANNOUNCEMENT_PHRASES = [
 ]
 ANNOUNCEMENT_END_SILENCE_S = 1.7
 
+# Volume ducking / smooth recovery (Staff Mode voice)
+DUCK_TARGET_VOLUME = 15          # % to drop to immediately when voice is detected
+SMOOTH_RECOVER_STEP = 5          # % added per tick during fade-in
+SMOOTH_RECOVER_INTERVAL_S = 0.2  # seconds between ticks (~3 s total for a 30-point climb)
+
+# Dynamic theming – audio_features thresholds and timing
+THEME_POLL_INTERVAL_S = 5       # how often the background thread checks for a new track
+THEME_ENERGY_THRESHOLD = 0.6    # energy above this = "high energy" quadrant
+THEME_VALENCE_THRESHOLD = 0.6   # valence above this = "high valence" quadrant
+THEME_UPDATE_INTERVAL_S = 5.0   # how often CameraView refreshes the border colour
+
 # Event log
 EVENT_LOG_MAX = 250
 

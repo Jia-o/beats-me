@@ -33,6 +33,11 @@ class PersonalMode:
     def get_event_log(self) -> list[dict]:
         return list(self._event_log)
 
+    def get_theme_color(self) -> tuple | None:
+        if hasattr(self._ctrl, "get_theme_color"):
+            return self._ctrl.get_theme_color()
+        return None
+
     def handle_result(self, result: dict):
         command = result.get("command")
         if command:
