@@ -89,6 +89,9 @@ class CameraView(ctk.CTkToplevel):
         # Stored as a BGR tuple; written only from the Tk main thread.
         self._theme_color: tuple[int, int, int] = (180, 180, 180)
         self._last_theme_update: float = 0.0
+        self._flash_text: str = ""
+        self._flash_until: float = 0.0
+        self._last_flash_command_seq: int | None = None
 
         self._build_ui()
 
@@ -185,6 +188,43 @@ class CameraView(ctk.CTkToplevel):
                         overlay_color, 2, cv2.LINE_AA,
                     )
 
+                # ── State-change flash (pause / unpause etc.) ─────────────────
+                if time.time() < self._flash_until and self._flash_text:
+                    cv2.putText(
+                        display, self._flash_text,
+                        (18, 92), cv2.FONT_HERSHEY_SIMPLEX, 1.6,
+                        (255, 255, 255), 4, cv2.LINE_AA,
+                    )
+                    cv2.putText(
+                        display, self._flash_text,
+                        (18, 92), cv2.FONT_HERSHEY_SIMPLEX, 1.6,
+                        (0, 0, 0), 2, cv2.LINE_AA,
+                    )
+
+                # ── Staff leaderboard overlay ────────────────────────────────
+                if hasattr(self._handler, "get_leaderboard"):
+                    try:
+                        lb = self._handler.get_leaderboard(limit=5) or []
+                        if lb:
+                            x = self.DISPLAY_W - 440
+                            y = 34
+                            cv2.putText(
+                                display, "Top played (staff):",
+                                (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                                (220, 220, 220), 2, cv2.LINE_AA,
+                            )
+                            y += 26
+                            for idx, (title, count) in enumerate(lb, start=1):
+                                line = f"{idx}. {title}  ({count})"
+                                cv2.putText(
+                                    display, line[:52],
+                                    (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
+                                    (200, 200, 200), 2, cv2.LINE_AA,
+                                )
+                                y += 22
+                    except Exception:
+                        pass
+
                 # ── Dynamic Theme Border ──────────────────────────────────────
                 h, w = display.shape[:2]
                 cv2.rectangle(display, (0, 0), (w - 1, h - 1), self._theme_color, 8)
@@ -263,6 +303,10 @@ class CameraView(ctk.CTkToplevel):
                 parts.append(f"cmd: {status['last_command']}")
             if status.get("announcement_paused"):
                 parts.append("announcement-paused")
+            if status.get("is_playing") is True:
+                parts.append("playing")
+            elif status.get("is_playing") is False:
+                parts.append("paused")
 
             self._status_label.configure(text=" | ".join(parts))
         except Exception:
@@ -270,6 +314,32 @@ class CameraView(ctk.CTkToplevel):
             return
 
         self._update_debug_windows()
+        self._maybe_trigger_flash(status)
+
+    def _maybe_trigger_flash(self, status: dict):
+        try:
+            last_cmd = status.get("last_command")
+            if last_cmd != "toggle_play":
+                return
+
+            # Only flash once per command (not once per time window).
+            seq = status.get("command_seq")
+            if isinstance(seq, int) and self._last_flash_command_seq == seq:
+                return
+
+            if status.get("is_playing") is True:
+                self._flash_text = "PLAYING"
+            elif status.get("is_playing") is False:
+                self._flash_text = "PAUSED"
+            else:
+                self._flash_text = "TOGGLED"
+
+            now = time.time()
+            self._flash_until = now + 1.1
+            if isinstance(seq, int):
+                self._last_flash_command_seq = seq
+        except Exception:
+            return
 
     def _toggle_debug(self):
         if self._debug_win and self._debug_win.winfo_exists():

@@ -69,6 +69,28 @@ class SpotifyController:
         except Exception:
             return False
 
+    def get_current_track_info(self) -> dict | None:
+        """
+        Best-effort current track info for UI overlays / analytics.
+        Returns:
+            {"id": str, "name": str, "artists": "A, B"}
+        or None if unavailable.
+        """
+        try:
+            playback = self._sp.current_playback()
+            if not playback or not playback.get("item"):
+                return None
+            item = playback["item"] or {}
+            track_id = item.get("id")
+            name = item.get("name")
+            artists = item.get("artists") or []
+            artist_names = ", ".join([a.get("name", "") for a in artists if a.get("name")])
+            if not track_id or not name:
+                return None
+            return {"id": track_id, "name": name, "artists": artist_names}
+        except Exception:
+            return None
+
     def get_album_art_url(self) -> str | None:
         """
         Return the best available album art URL for the currently playing track.

@@ -40,8 +40,10 @@ class SelectionScreen(ctk.CTk):
         self._callback = on_mode_selected
 
         self.title("beats-me")
-        self.geometry("660x520")
-        self.resizable(False, False)
+        # Big "selection" screen: sized for readability on external displays.
+        self.geometry("1040x720")
+        self.minsize(960, 680)
+        self.resizable(True, True)
 
         self._build_ui()
 
@@ -55,80 +57,84 @@ class SelectionScreen(ctk.CTk):
 
     def _build_ui(self):
         self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
 
         # ---- header ----
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.grid(row=0, column=0, pady=(52, 4))
+        header.grid(row=0, column=0, pady=(54, 10))
 
         ctk.CTkLabel(
             header,
             text="beats-me",
-            font=ctk.CTkFont(family="Helvetica", size=52, weight="bold"),
+            font=ctk.CTkFont(family="Helvetica", size=64, weight="bold"),
             text_color=_ACCENT,
         ).pack()
 
         ctk.CTkLabel(
             header,
             text="Choose how you want to control your music",
-            font=ctk.CTkFont(size=15),
+            font=ctk.CTkFont(size=18),
             text_color="gray60",
         ).pack(pady=(6, 0))
 
         # ---- mode cards ----
         cards_frame = ctk.CTkFrame(self, fg_color="transparent")
-        cards_frame.grid(row=1, column=0, padx=48, pady=(28, 0), sticky="ew")
+        cards_frame.grid(row=1, column=0, padx=64, pady=(18, 0), sticky="nsew")
         cards_frame.grid_columnconfigure(0, weight=1)
+        cards_frame.grid_rowconfigure(0, weight=1)
+        cards_frame.grid_rowconfigure(1, weight=1)
 
         for i, (icon, label, mode, desc) in enumerate(_MODES):
             card = ctk.CTkFrame(cards_frame, corner_radius=14, fg_color=_BG_CARD)
-            card.grid(row=i, column=0, pady=10, sticky="ew")
+            card.grid(row=i, column=0, pady=12, sticky="nsew")
             card.grid_columnconfigure(1, weight=1)
 
             # icon badge
             icon_lbl = ctk.CTkLabel(
                 card,
                 text=icon,
-                font=ctk.CTkFont(size=34),
+                font=ctk.CTkFont(size=44),
                 width=60,
             )
-            icon_lbl.grid(row=0, column=0, rowspan=2, padx=(20, 10), pady=20)
+            icon_lbl.grid(row=0, column=0, rowspan=2, padx=(26, 14), pady=26)
 
             # title + description
             ctk.CTkLabel(
                 card,
                 text=label,
-                font=ctk.CTkFont(size=18, weight="bold"),
+                font=ctk.CTkFont(size=26, weight="bold"),
                 anchor="w",
-            ).grid(row=0, column=1, sticky="sw", pady=(18, 2))
+            ).grid(row=0, column=1, sticky="sw", pady=(22, 6))
 
             ctk.CTkLabel(
                 card,
                 text=desc,
-                font=ctk.CTkFont(size=12),
+                font=ctk.CTkFont(size=16),
                 text_color="gray60",
                 anchor="w",
                 justify="left",
-            ).grid(row=1, column=1, sticky="nw", pady=(0, 18))
+                wraplength=640,
+            ).grid(row=1, column=1, sticky="nw", pady=(0, 22))
 
             # launch button
             btn = ctk.CTkButton(
                 card,
                 text="Select",
-                width=90,
-                height=36,
+                width=120,
+                height=44,
                 corner_radius=8,
                 fg_color=_ACCENT,
                 hover_color="#17a845",
                 text_color="#000000",
-                font=ctk.CTkFont(size=13, weight="bold"),
+                font=ctk.CTkFont(size=16, weight="bold"),
                 command=lambda m=mode: self._callback(m),
             )
-            btn.grid(row=0, column=2, rowspan=2, padx=20, pady=20)
+            btn.grid(row=0, column=2, rowspan=2, padx=26, pady=26)
 
         # ---- footer hint ----
         ctk.CTkLabel(
             self,
             text="Press  M  at any time to return here",
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(size=14),
             text_color="gray40",
-        ).grid(row=2, column=0, pady=(18, 0))
+        ).grid(row=2, column=0, pady=(20, 24))

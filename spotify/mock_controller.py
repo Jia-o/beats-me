@@ -44,5 +44,8 @@ class MockSpotifyController:
     def is_music_playing(self) -> bool:
         return False
 
+    def get_current_track_info(self) -> dict | None:
+        return None
+
     def get_album_art_url(self) -> str | None:
         return None
