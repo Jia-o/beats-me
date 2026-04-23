@@ -7,12 +7,16 @@ the camera loop to decide whether to call process_frame at all, which lets
 us avoid wasting CPU on models that aren't needed for the current mode.
 """
 
+from collections import deque
+
 
 class PerceptionEngine:
     """Base class – handles the active/inactive lifecycle."""
 
     def __init__(self):
         self._active = False
+        self.shush_active: bool = False
+        self.background_mask: deque = deque(maxlen=5)
 
     # ------------------------------------------------------------------
     # Lifecycle
