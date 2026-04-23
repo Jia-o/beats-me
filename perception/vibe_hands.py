@@ -25,13 +25,6 @@ _mp_drawing_styles = _vision.drawing_styles
 
 
 class VibeHandsEngine(PerceptionEngine):
-    """
-    Vision pipeline:
-    - Selfie segmentation generates a 'me' alpha mask.
-    - Background is either (a) blurred album art from Spotify or (b) blurred room.
-    - Composite: blurred bg (bottom) + me (middle) + hand lines (top).
-    """
-
     def __init__(self, background_provider=None):
         super().__init__()
         self._background_provider = background_provider  # callable() -> np.ndarray|None (BGR)
@@ -121,12 +114,6 @@ class VibeHandsEngine(PerceptionEngine):
             return None
 
     def _get_blurred_background(self, frame_bgr: np.ndarray) -> np.ndarray:
-        """
-        Provider can return:
-        - np.ndarray (BGR) album art image
-        - str URL to album art
-        - None (no music) -> use blurred room
-        """
         h, w = frame_bgr.shape[:2]
 
         src = None

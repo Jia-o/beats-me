@@ -1,15 +1,7 @@
 import time
-
 import config
 
-
 class StaffMode:
-    """
-    Staff mode:
-    - Plays from the staff playlist.
-    - Gesture controls: pinch (pause/play), V-shape (skip), point (volume).
-    """
-
     def __init__(self, controller):
         self._ctrl = controller
         self._event_log: list[dict] = []

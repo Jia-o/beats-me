@@ -1,34 +1,3 @@
-"""
-ui/camera_view.py – displays the live camera feed with MediaPipe overlays.
-
-Architecture
-------------
-* A daemon thread captures frames from the webcam and runs the active
-  perception engine.  Each processed frame is placed in a small queue.
-* The Tkinter event loop polls that queue every ~33 ms (~30 fps) and updates
-  a CTkLabel to show the latest frame.
-* Spotify API calls are already dispatched to daemon threads by the controller,
-  so the camera thread only calls mode_handler.handle(), which is fast.
-
-Press M (or m) to stop the camera and return to the mode-selection screen.
-
-Visual Feedback Overlay
------------------------
-A HUD line is rendered directly onto the OpenCV frame to show the user what
-gesture is being recognised:
-  • "Hand detected"        – a hand is visible but no gesture is building yet.
-  • "Pinch…"               – pinch gesture is building (not yet fired).
-  • "Raising volume…"      – point-up is building.
-  • "Lowering volume…"     – point-down is building.
-  • "V left/right…"        – V-shape is building for next/previous track.
-  • Confirmed command text – displayed in a distinct colour when the command fires.
-
-Dynamic Theme Border
---------------------
-The camera frame border changes colour to reflect the current track's mood
-(valence × energy from Spotify audio_features). Updated every few seconds.
-"""
-
 import queue
 import threading
 import time
@@ -38,6 +7,7 @@ import customtkinter as ctk
 from PIL import Image
 
 import config
+import re 
 
 # ---------------------------------------------------------------------------
 # HUD overlay label tables  (BGR colours for cv2.putText)
@@ -179,49 +149,46 @@ class CameraView(ctk.CTkToplevel):
 
                 display = cv2.resize(annotated, (self.DISPLAY_W, self.DISPLAY_H))
 
+                # -- Helper for Outlined Text (Define this inside the loop or as a method) --
+                def draw_outlined(img, text, pos, scale, color, thick):
+                    # Draw Black Outline
+                    cv2.putText(img, text, pos, cv2.FONT_HERSHEY_SIMPLEX, scale, (0, 0, 0), thick + 2, cv2.LINE_AA)
+                    # Draw Main Color Text
+                    cv2.putText(img, text, pos, cv2.FONT_HERSHEY_SIMPLEX, scale, color, thick, cv2.LINE_AA)
+
                 # ── Visual Feedback Overlay ──────────────────────────────────
                 overlay_text, overlay_color = self._get_overlay_info(self._latest_result)
                 if overlay_text:
-                    cv2.putText(
-                        display, overlay_text,
-                        (12, 38), cv2.FONT_HERSHEY_SIMPLEX, 1.0,
-                        overlay_color, 2, cv2.LINE_AA,
-                    )
+                    draw_outlined(display, overlay_text, (12, 38), 1.0, overlay_color, 2)
 
-                # ── State-change flash (pause / unpause etc.) ─────────────────
+                # ── State-change flash (REDUCED FONT SIZE) ───────────────────
                 if time.time() < self._flash_until and self._flash_text:
-                    cv2.putText(
-                        display, self._flash_text,
-                        (18, 92), cv2.FONT_HERSHEY_SIMPLEX, 1.6,
-                        (255, 255, 255), 4, cv2.LINE_AA,
-                    )
-                    cv2.putText(
-                        display, self._flash_text,
-                        (18, 92), cv2.FONT_HERSHEY_SIMPLEX, 1.6,
-                        (0, 0, 0), 2, cv2.LINE_AA,
-                    )
+                    # Reduced from 1.6 to 1.0
+                    draw_outlined(display, self._flash_text, (18, 92), 1.0, (255, 255, 255), 2)
 
-                # ── Staff leaderboard overlay ────────────────────────────────
+                # ── Staff leaderboard overlay (REPOSITIONED & FILTERED) ──────
                 if hasattr(self._handler, "get_leaderboard"):
                     try:
                         lb = self._handler.get_leaderboard(limit=5) or []
                         if lb:
-                            x = self.DISPLAY_W - 440
-                            y = 34
-                            cv2.putText(
-                                display, "Top played (staff):",
-                                (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                                (220, 220, 220), 2, cv2.LINE_AA,
-                            )
-                            y += 26
-                            for idx, (title, count) in enumerate(lb, start=1):
-                                line = f"{idx}. {title}  ({count})"
-                                cv2.putText(
-                                    display, line[:52],
-                                    (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
-                                    (200, 200, 200), 2, cv2.LINE_AA,
-                                )
+                            # Move X further left (from -440 to -320) to stay on screen
+                            x = self.DISPLAY_W - 320 
+                            y = 40
+                            draw_outlined(display, "Top Played This Session:", (x, y), 0.6, (180, 180, 180), 2)
+                            
+                            y += 30
+
+                            for idx, (raw_title, count) in enumerate(lb, start=1):
+                                parts = re.split(r'\W{2,}', raw_title)
+                                song = parts[0].strip()
+                                artist = parts[1].strip() if len(parts) > 1 else "Unknown"
+                                display_song = f"{idx}. {song[:22]}.." if len(song) > 22 else f"{idx}. {song}"
+                                draw_outlined(display, display_song, (x, y), 0.6, (255, 255, 255), 2)
+
                                 y += 22
+                                display_artist = artist[:22] + ".." if len(artist) > 22 else artist
+                                draw_outlined(display, f"   {display_artist}", (x, y), 0.45, (180, 180, 180), 1)
+                                y += 35
                     except Exception:
                         pass
 
@@ -326,13 +293,7 @@ class CameraView(ctk.CTkToplevel):
             seq = status.get("command_seq")
             if isinstance(seq, int) and self._last_flash_command_seq == seq:
                 return
-
-            if status.get("is_playing") is True:
-                self._flash_text = "PLAYING"
-            elif status.get("is_playing") is False:
-                self._flash_text = "PAUSED"
-            else:
-                self._flash_text = "TOGGLED"
+            self._flash_text = "PLAY / PAUSE TOGGLED"
 
             now = time.time()
             self._flash_until = now + 1.1
