@@ -138,6 +138,7 @@ class HandsEngine(PerceptionEngine):
         result["debug"] = {
             "raw": raw,
             "cooldown_until": self._cooldown_until_ts,
+            "pending": self._get_pending_gesture(),
         }
         return annotated, result
 
@@ -149,6 +150,18 @@ class HandsEngine(PerceptionEngine):
         return {
             "last_command": self._last_command,
         }
+
+    def _get_pending_gesture(self) -> str | None:
+        """Return a label for a gesture that is building but hasn't fired yet."""
+        if self._pinch_frames > 0 and not self._pinched:
+            return "toggle_play"
+        if self._point_up_frames > 0:
+            return "vol_up"
+        if self._point_down_frames > 0:
+            return "vol_down"
+        if self._swipe_active:
+            return "swipe"
+        return None
 
     def _classify_raw(self, lms) -> dict:
         thumb_tip  = lms[4]

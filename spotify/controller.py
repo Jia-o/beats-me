@@ -24,6 +24,18 @@ class SpotifyController:
             )
         )
 
+        # Duck / smooth-recover state
+        self._pre_duck_volume: int | None = None
+        self._recover_token: int = 0
+
+        # Dynamic theme state
+        self._theme_color: tuple[int, int, int] = (180, 180, 180)  # neutral gray BGR
+        self._theme_lock = threading.Lock()
+        self._last_track_id: str | None = None
+
+        # Start background theme poller
+        threading.Thread(target=self._theme_poll_loop, daemon=True).start()
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -170,3 +182,102 @@ class SpotifyController:
             self._sp.start_playback,
             context_uri=f"spotify:playlist:{playlist_id}",
         )
+
+    # ------------------------------------------------------------------
+    # Volume ducking and smooth recovery
+    # ------------------------------------------------------------------
+
+    def duck_volume(self, target: int = config.DUCK_TARGET_VOLUME):
+        """Save current volume and immediately drop to *target* percent."""
+        print(f"[Spotify] Duck volume → {target}%")
+
+        def _do_duck():
+            try:
+                vol = self._current_volume()
+                if vol is not None:
+                    self._pre_duck_volume = vol
+                self._set_volume(target)
+            except SpotifyException as exc:
+                self._handle_exc(exc)
+
+        threading.Thread(target=_do_duck, daemon=True).start()
+
+    def smooth_recover_volume(self):
+        """Gradually restore volume to the level saved by duck_volume (3 s fade-in)."""
+        target = self._pre_duck_volume
+        if target is None:
+            return
+        print(f"[Spotify] Smooth volume recovery → {target}%")
+        # Bump token to cancel any ongoing recovery thread.
+        self._recover_token += 1
+        token = self._recover_token
+        self._dispatch(self._do_smooth_recover, target, token)
+
+    def _do_smooth_recover(self, target: int, token: int):
+        try:
+            current = self._current_volume()
+            if current is None:
+                return
+            vol = current
+            while vol < target:
+                if self._recover_token != token:
+                    return  # cancelled by a newer call
+                vol = min(vol + config.SMOOTH_RECOVER_STEP, target)
+                self._set_volume(vol)
+                time.sleep(config.SMOOTH_RECOVER_INTERVAL_S)
+        except SpotifyException as exc:
+            self._handle_exc(exc)
+
+    # ------------------------------------------------------------------
+    # Dynamic theming
+    # ------------------------------------------------------------------
+
+    def get_theme_color(self) -> tuple[int, int, int]:
+        """Return a cached BGR color derived from the current track's audio features."""
+        with self._theme_lock:
+            return self._theme_color
+
+    def _theme_poll_loop(self):
+        """Daemon thread: detect song changes and update the cached theme color."""
+        while True:
+            try:
+                track_id = self._current_track_id()
+                if track_id and track_id != self._last_track_id:
+                    self._last_track_id = track_id
+                    features = self._sp.audio_features([track_id])
+                    if features and features[0]:
+                        valence = features[0].get("valence", 0.5)
+                        energy = features[0].get("energy", 0.5)
+                        color = self._map_to_color(valence, energy)
+                        with self._theme_lock:
+                            self._theme_color = color
+            except Exception:
+                pass
+            time.sleep(5)
+
+    def _current_track_id(self) -> str | None:
+        try:
+            playback = self._sp.current_playback()
+            if playback and playback.get("item"):
+                return playback["item"].get("id")
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
+    def _map_to_color(valence: float, energy: float) -> tuple[int, int, int]:
+        """Map Spotify audio features valence/energy to a BGR color.
+
+        Quadrant mapping:
+          High energy + High valence  →  Warm Orange  (bright / party)
+          High energy + Low  valence  →  Bright Red   (intense / dark)
+          Low  energy + High valence  →  Sun Yellow   (peaceful / happy)
+          Low  energy + Low  valence  →  Deep Blue    (calm / melancholy)
+        """
+        if energy >= 0.6 and valence >= 0.6:
+            return (0, 165, 255)    # Orange (BGR)
+        if energy >= 0.6 and valence < 0.6:
+            return (0, 30, 220)     # Red (BGR)
+        if energy < 0.6 and valence >= 0.6:
+            return (0, 230, 255)    # Yellow (BGR)
+        return (160, 80, 30)        # Deep Blue (BGR)

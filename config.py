@@ -61,6 +61,11 @@ STAFF_ANNOUNCEMENT_PHRASES = [
 ]
 ANNOUNCEMENT_END_SILENCE_S = 1.7
 
+# Volume ducking / smooth recovery (Staff Mode voice)
+DUCK_TARGET_VOLUME = 15          # % to drop to immediately when voice is detected
+SMOOTH_RECOVER_STEP = 5          # % added per tick during fade-in
+SMOOTH_RECOVER_INTERVAL_S = 0.2  # seconds between ticks (~3 s total for a 30-point climb)
+
 # Event log
 EVENT_LOG_MAX = 250
 
