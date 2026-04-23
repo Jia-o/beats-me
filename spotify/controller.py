@@ -253,7 +253,7 @@ class SpotifyController:
                             self._theme_color = color
             except Exception:
                 pass
-            time.sleep(5)
+            time.sleep(config.THEME_POLL_INTERVAL_S)
 
     def _current_track_id(self) -> str | None:
         try:
@@ -274,10 +274,10 @@ class SpotifyController:
           Low  energy + High valence  →  Sun Yellow   (peaceful / happy)
           Low  energy + Low  valence  →  Deep Blue    (calm / melancholy)
         """
-        if energy >= 0.6 and valence >= 0.6:
+        if energy >= config.THEME_ENERGY_THRESHOLD and valence >= config.THEME_VALENCE_THRESHOLD:
             return (0, 165, 255)    # Orange (BGR)
-        if energy >= 0.6 and valence < 0.6:
+        if energy >= config.THEME_ENERGY_THRESHOLD and valence < config.THEME_VALENCE_THRESHOLD:
             return (0, 30, 220)     # Red (BGR)
-        if energy < 0.6 and valence >= 0.6:
+        if energy < config.THEME_ENERGY_THRESHOLD and valence >= config.THEME_VALENCE_THRESHOLD:
             return (0, 230, 255)    # Yellow (BGR)
         return (160, 80, 30)        # Deep Blue (BGR)

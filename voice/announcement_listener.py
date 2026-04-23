@@ -166,15 +166,23 @@ class AnnouncementListener:
             return
         now = time.time()
         if (now - self._last_speech_ts) >= config.ANNOUNCEMENT_END_SILENCE_S:
+            # Track whether the announcement ended in this same pass so we can
+            # avoid firing _on_ducking_end redundantly (the announcement_end
+            # callback already handles recovery for that path).
+            announcement_ended = False
             if self._in_announcement:
                 self._in_announcement = False
+                announcement_ended = True
                 try:
                     self._on_end({"reason": "silence_window"})
                 except Exception:
                     pass
             if self._ducking:
                 self._ducking = False
-                if self._on_ducking_end:
+                # Only fire ducking_end when the announcement didn't also end
+                # here; when both end together the announcement_end callback
+                # already covers volume recovery.
+                if self._on_ducking_end and not announcement_ended:
                     try:
                         self._on_ducking_end({"reason": "silence_window"})
                     except Exception:

@@ -59,6 +59,7 @@ _PENDING_LABELS: dict[str, tuple[str, tuple[int, int, int]]] = {
 }
 
 _HAND_DETECTED_LABEL = ("Hand detected", (200, 200, 200))
+_NO_OVERLAY = ("", (0, 0, 0))  # returned when there is nothing to display
 
 
 class CameraView(ctk.CTkToplevel):
@@ -214,9 +215,9 @@ class CameraView(ctk.CTkToplevel):
         except queue.Empty:
             pass
 
-        # Refresh theme colour from controller every 5 seconds.
+        # Refresh theme colour from controller every THEME_UPDATE_INTERVAL_S seconds.
         now = time.time()
-        if now - self._last_theme_update >= 5.0:
+        if now - self._last_theme_update >= config.THEME_UPDATE_INTERVAL_S:
             self._last_theme_update = now
             self._refresh_theme_color()
 
@@ -248,7 +249,7 @@ class CameraView(ctk.CTkToplevel):
         if result.get("hand_present"):
             return _HAND_DETECTED_LABEL
 
-        return "", (255, 255, 255)
+        return _NO_OVERLAY
 
     def _update_status(self):
         try:
