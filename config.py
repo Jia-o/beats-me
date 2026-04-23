@@ -8,13 +8,13 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 SPOTIPY_CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
 SPOTIPY_CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
-SPOTIPY_REDIRECT_URI = os.getenv("SPOTIPY_REDIRECT_URI", "http://localhost:8888/callback")
+SPOTIPY_REDIRECT_URI = os.getenv("SPOTIPY_REDIRECT_URI")
 
 # ---------------------------------------------------------------------------
 # Playlist IDs – replace these with real Spotify playlist IDs
 # ---------------------------------------------------------------------------
-PERSONAL_PLAYLIST = "37i9dQZF1EIfjzgnbx4yqL"  # Personal mode playlist
-STAFF_PLAYLIST    = "37i9dQZF1EIfjzgnbx4yqL"  # Staff mode playlist
+PERSONAL_PLAYLIST = "7B1tUsr6cwRpSAlqa8BoTy?si=41dd9e829bd141d8"  # Personal mode playlist
+STAFF_PLAYLIST    = "7B1tUsr6cwRpSAlqa8BoTy?si=41dd9e829bd141d8"  # Staff mode playlist
 
 # ---------------------------------------------------------------------------
 # Camera
