@@ -26,7 +26,7 @@ gesture is being recognised:
 Dynamic Theme Border
 --------------------
 The camera frame border changes colour to reflect the current track's mood
-(valence × energy from Spotify audio_features). Updated every 5 seconds.
+(valence × energy from Spotify audio_features). Updated every few seconds.
 """
 
 import queue
@@ -235,9 +235,15 @@ class CameraView(ctk.CTkToplevel):
         except Exception:
             pass
 
-    @staticmethod
-    def _get_overlay_info(result: dict) -> tuple[str, tuple[int, int, int]]:
+    def _get_overlay_info(self, result: dict) -> tuple[str, tuple[int, int, int]]:
         """Return (hud_text, bgr_color) for the frame overlay, or ('', ...) for none."""
+        try:
+            if hasattr(self._handler, "get_status"):
+                if (self._handler.get_status() or {}).get("mute_active"):
+                    return ("MUTE", (30, 30, 255))
+        except Exception:
+            pass
+
         command = result.get("command")
         if command and command in _COMMAND_LABELS:
             return _COMMAND_LABELS[command]
@@ -264,6 +270,8 @@ class CameraView(ctk.CTkToplevel):
                 parts.append(f"cmd: {status['last_command']}")
             if status.get("announcement_paused"):
                 parts.append("announcement-paused")
+            if status.get("mute_active"):
+                parts.append("mute")
 
             self._status_label.configure(text=" | ".join(parts))
         except Exception:

@@ -2,6 +2,7 @@ import customtkinter as ctk
 
 import config
 from perception.hands import HandsEngine
+from perception.staff_shush import StaffShushEngine
 from modes.personal_mode import PersonalMode
 from modes.staff_mode    import StaffMode
 from ui.selection_screen  import SelectionScreen
@@ -47,7 +48,7 @@ def main():
             handler = PersonalMode(controller)
             name = "Personal Mode"
         elif mode == "staff":
-            engine = HandsEngine()
+            engine = StaffShushEngine()
             handler = StaffMode(controller)
             name = "Staff Mode"
         else:

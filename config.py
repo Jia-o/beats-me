@@ -70,3 +70,26 @@ THEME_UPDATE_INTERVAL_S = 5.0   # how often CameraView refreshes the border colo
 # Event log
 EVENT_LOG_MAX = 250
 
+# ---------------------------------------------------------------------------
+# Vibe background + segmentation (Dynamic Theming replacement)
+# ---------------------------------------------------------------------------
+# Background blur strength (bigger = blurrier).
+VIBE_BG_BLUR_SIGMA = 55.0
+
+# Segmentation edge smoothing blur sigma.
+SEG_EDGE_BLUR_SIGMA = 6.0
+
+# Temporal smoothing factor for segmentation alpha (EMA). Higher = more responsive,
+# lower = steadier edges.
+SEG_TEMPORAL_SMOOTH_ALPHA = 0.35
+
+# Album art fetch caching (seconds).
+ALBUM_ART_CACHE_S = 12.0
+
+# ---------------------------------------------------------------------------
+# "Shush" gesture (index finger over lips) for Staff Mode
+# ---------------------------------------------------------------------------
+# Normalized thresholds in face/hand coordinate space.
+SHUSH_MOUTH_X_THRESH = 0.055
+SHUSH_MOUTH_Y_THRESH = 0.060
+

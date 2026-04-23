@@ -28,6 +28,10 @@ class SpotifyController:
         self._pre_duck_volume: int | None = None
         self._recover_token: int = 0
 
+        # Mute (gesture) state
+        self._pre_mute_volume: int | None = None
+        self._mute_active: bool = False
+
         # Dynamic theme state
         self._theme_color: tuple[int, int, int] = (180, 180, 180)  # neutral gray BGR
         self._theme_lock = threading.Lock()
@@ -63,6 +67,37 @@ class SpotifyController:
         if playback and playback.get("device") and playback["device"].get("volume_percent") is not None:
             return int(playback["device"]["volume_percent"])
         return None
+
+    def get_current_volume(self) -> int | None:
+        """Public accessor for current device volume, if available."""
+        try:
+            return self._current_volume()
+        except Exception:
+            return None
+
+    def is_music_playing(self) -> bool:
+        try:
+            playback = self._sp.current_playback()
+            return bool(playback and playback.get("is_playing"))
+        except Exception:
+            return False
+
+    def get_album_art_url(self) -> str | None:
+        """
+        Return the best available album art URL for the currently playing track.
+        """
+        try:
+            playback = self._sp.current_playback()
+            if not playback or not playback.get("item"):
+                return None
+            album = playback["item"].get("album") or {}
+            images = album.get("images") or []
+            if not images:
+                return None
+            # Prefer highest-res (Spotify returns sorted by size desc).
+            return images[0].get("url")
+        except Exception:
+            return None
 
     def _set_volume(self, vol: int):
         self._sp.volume(max(0, min(100, int(vol))))
@@ -227,6 +262,44 @@ class SpotifyController:
                 time.sleep(config.SMOOTH_RECOVER_INTERVAL_S)
         except SpotifyException as exc:
             self._handle_exc(exc)
+
+    # ------------------------------------------------------------------
+    # Gesture mute (shush)
+    # ------------------------------------------------------------------
+
+    def gesture_mute_start(self):
+        """Save current volume and set Spotify volume to 0."""
+        if self._mute_active:
+            return
+        self._mute_active = True
+
+        def _do():
+            try:
+                vol = self._current_volume()
+                if vol is not None and vol > 0:
+                    self._pre_mute_volume = vol
+                self._set_volume(0)
+            except SpotifyException as exc:
+                self._handle_exc(exc)
+
+        threading.Thread(target=_do, daemon=True).start()
+
+    def gesture_mute_release(self):
+        """Restore volume to the value saved by gesture_mute_start (if any)."""
+        if not self._mute_active:
+            return
+        self._mute_active = False
+        target = self._pre_mute_volume
+        if target is None:
+            return
+
+        def _do():
+            try:
+                self._set_volume(target)
+            except SpotifyException as exc:
+                self._handle_exc(exc)
+
+        threading.Thread(target=_do, daemon=True).start()
 
     # ------------------------------------------------------------------
     # Dynamic theming

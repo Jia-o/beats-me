@@ -20,6 +20,18 @@ HAND_MODEL_URL = (
     "hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task"
 )
 
+# Public download URL for the face landmarker model bundle.
+FACE_MODEL_URL = (
+    "https://storage.googleapis.com/mediapipe-models/"
+    "face_landmarker/face_landmarker/float16/latest/face_landmarker.task"
+)
+
+# Public download URL for selfie segmentation (tflite model).
+SELFIE_SEGMENTER_MODEL_URL = (
+    "https://storage.googleapis.com/mediapipe-models/"
+    "image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite"
+)
+
 
 def ensure_model(url: str, filename: str) -> str:
     """Return the absolute path to *filename*, downloading it first if absent.

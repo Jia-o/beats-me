@@ -1,7 +1,6 @@
 import time
 
 import config
-from voice.announcement_listener import AnnouncementListener
 
 
 class StaffMode:
@@ -9,7 +8,7 @@ class StaffMode:
     Staff mode:
     - Plays from the staff playlist.
     - Gesture controls: pinch (pause/play), V-shape (skip), point (volume).
-    - Voice phrase pauses music for announcements, resumes when speech settles.
+    - Shush gesture (index finger over lips) mutes Spotify while active.
     """
 
     def __init__(self, controller):
@@ -17,32 +16,30 @@ class StaffMode:
         self._event_log: list[dict] = []
         self._last_command: str | None = None
 
-        self._announcement_paused = False
+        self._mute_active = False
+        self._pre_mute_volume: int | None = None
 
         if config.STAFF_PLAYLIST:
             self._ctrl.play_playlist(config.STAFF_PLAYLIST)
 
-        self._listener = AnnouncementListener(
-            phrases=config.STAFF_ANNOUNCEMENT_PHRASES,
-            on_announcement_start=self._on_announcement_start,
-            on_announcement_end=self._on_announcement_end,
-            on_ducking_start=self._on_ducking_start,
-            on_ducking_end=self._on_ducking_end,
-        )
-        self._listener.start()
-
     # ---------------------------- public hooks ----------------------------
 
     def close(self):
+        # Ensure we never leave Spotify muted when exiting the mode.
         try:
-            self._listener.stop()
+            if self._mute_active:
+                self._mute_active = False
+                if hasattr(self._ctrl, "gesture_mute_release"):
+                    self._ctrl.gesture_mute_release()
+                elif self._pre_mute_volume is not None:
+                    self._ctrl.set_volume(self._pre_mute_volume)
         except Exception:
             pass
 
     def get_status(self) -> dict:
         return {
             "mode": "staff",
-            "announcement_paused": self._announcement_paused,
+            "mute_active": self._mute_active,
             "playlist": config.STAFF_PLAYLIST,
             "last_command": self._last_command,
         }
@@ -62,32 +59,27 @@ class StaffMode:
             self._log("command", {"command": command})
             self._handle_command(command)
 
-    # ---------------------------- voice events ----------------------------
-
-    def _on_announcement_start(self, meta: dict):
-        if not self._announcement_paused:
-            self._announcement_paused = True
-            self._log("announcement_pause", meta)
-            self._ctrl.pause()
-
-    def _on_announcement_end(self, meta: dict):
-        if self._announcement_paused:
-            self._announcement_paused = False
-            self._log("announcement_resume", meta)
-            self._ctrl.toggle_play()
-            # Smooth recovery picks up from the ducked level set earlier.
-            self._ctrl.smooth_recover_volume()
-
-    def _on_ducking_start(self, meta: dict):
-        self._log("ducking_start", meta)
-        self._ctrl.duck_volume()
-
-    def _on_ducking_end(self, meta: dict):
-        self._log("ducking_end", meta)
-        # Only recover here when the announcement didn't trigger a full pause;
-        # _on_announcement_end already calls smooth_recover_volume for that path.
-        if not self._announcement_paused:
-            self._ctrl.smooth_recover_volume()
+        if result.get("shush_tap"):
+            if not self._mute_active:
+                self._mute_active = True
+                self._log("mute_start", {"reason": "shush_tap"})
+                if hasattr(self._ctrl, "gesture_mute_start"):
+                    self._ctrl.gesture_mute_start()
+                else:
+                    # Fallback path: save volume (if possible) then mute.
+                    if hasattr(self._ctrl, "get_current_volume"):
+                        try:
+                            self._pre_mute_volume = self._ctrl.get_current_volume()
+                        except Exception:
+                            self._pre_mute_volume = None
+                    self._ctrl.set_volume(0)
+            else:
+                self._mute_active = False
+                self._log("mute_release", {"reason": "shush_tap"})
+                if hasattr(self._ctrl, "gesture_mute_release"):
+                    self._ctrl.gesture_mute_release()
+                elif self._pre_mute_volume is not None:
+                    self._ctrl.set_volume(self._pre_mute_volume)
 
     # ---------------------------- internals ----------------------------
 
