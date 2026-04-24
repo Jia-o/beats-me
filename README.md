@@ -1,6 +1,6 @@
 # beats me
 
-Control Spotify playback through movement and gestures using your webcam.
+Control Spotify playback and data through hand gestures using your webcam.
 
 ## Setup
 ```bash
